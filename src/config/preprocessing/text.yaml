@@ -1,0 +1,12 @@
+text:
+  model_name: "bert-base-uncased"
+  max_length: 512
+  apply_cleaning: true
+  apply_lemmatization: true
+  projection_dim: 256
+  dropout: 0.3
+  
+  business_rules:
+    check_title_desc_match: true
+    min_desc_length: 50
+    max_title_length: 100

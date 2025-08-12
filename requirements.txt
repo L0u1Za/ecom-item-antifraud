@@ -1,0 +1,13 @@
+numpy
+pandas
+scikit-learn
+torch
+torchvision
+transformers
+wandb
+opencv-python
+Pillow
+tqdm
+optuna
+hydra
+timm

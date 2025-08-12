@@ -1,0 +1,14 @@
+tabular:
+  categorical_cols:
+    - category
+    - brand
+    - condition
+    
+  numerical_cols:
+    - price
+    - quantity
+    - rating
+    
+  encoding: "label"
+  scaling: "standard"
+  input_dim: 128

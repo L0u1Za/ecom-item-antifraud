@@ -1,0 +1,50 @@
+from torch.utils.data import DataLoader
+from typing import Optional, Dict
+import hydra
+from omegaconf import DictConfig
+from processor import ImageProcessor, TabularProcessor, TextProcessor
+from fraud_dataset import FraudDataset
+
+class DataLoaderFactory:
+    @staticmethod
+    def create_dataloaders(
+        config: DictConfig,
+        text_processor: Optional[TextProcessor] = None,
+        image_processor: Optional[ImageProcessor] = None,
+        tabular_processor: Optional[TabularProcessor] = None
+    ) -> Dict[str, DataLoader]:
+        
+        # Create datasets
+        train_dataset = FraudDataset(
+            text_processor=text_processor,
+            image_processor=image_processor,
+            tabular_processor=tabular_processor
+        )
+        
+        val_dataset = FraudDataset(
+            text_processor=text_processor,
+            image_processor=image_processor,
+            tabular_processor=tabular_processor
+        )
+        
+        # Create dataloaders
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.training.batch_size,
+            shuffle=True,
+            num_workers=config.data.num_workers,
+            pin_memory=True
+        )
+        
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=config.training.batch_size,
+            shuffle=False,
+            num_workers=config.data.num_workers,
+            pin_memory=True
+        )
+        
+        return {
+            'train': train_loader,
+            'val': val_loader
+        }

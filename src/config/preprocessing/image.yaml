@@ -1,0 +1,12 @@
+image:
+  size: [224, 224]
+  clip_model: "openai/clip-vit-base-patch32"
+  cache_dir: "cache/clip_embeddings"
+  
+  augmentations:
+    - random_horizontal_flip
+    - random_rotation
+    - color_jitter
+    
+  compute_clip_similarity: true
+  cache_embeddings: true

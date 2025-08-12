@@ -1,0 +1,21 @@
+model:
+  text:
+    name: "bert-base-uncased"
+    projection_dim: 256
+    dropout: 0.3
+    
+  image:
+    name: "resnet50"
+    pretrained: true
+    projection_dim: 256
+    dropout: 0.3
+    
+  tabular:
+    input_dim: 128
+    hidden_dim: 256
+    projection_dim: 256
+    dropout: 0.3
+    
+  classifier:
+    hidden_dim: 512
+    dropout: 0.5

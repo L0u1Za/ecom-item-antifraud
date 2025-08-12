@@ -1,0 +1,14 @@
+defaults:
+  - preprocessing: text
+  - preprocessing: image
+  - preprocessing: tabular
+  - model: architecture
+  - model: fusion
+  - training: default
+  - experiment: default
+  - _self_
+
+project:
+  name: fraud-detection
+  seed: 42
+  output_dir: ${hydra:runtime.output_dir}
