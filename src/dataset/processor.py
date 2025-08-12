@@ -4,12 +4,10 @@ from torchvision import transforms
 import numpy as np
 from typing import Dict, Any, List
 
-from preprocessing.text import (
-    clean_html,
-    normalize_text,
-    lemmatize_text,
-    check_title_description_match
-)
+from preprocessing.text.cleaner import TextCleaner
+from preprocessing.text.normalizer import normalize_text
+from preprocessing.text.business_rules import BusinessRulesChecker
+
 from preprocessing.image import (
     get_image_augmentations,
     compute_clip_embeddings,
@@ -25,28 +23,37 @@ class TextProcessor:
                  model_name='bert-base-uncased',
                  max_length=512,
                  apply_cleaning=True,
-                 apply_lemmatization=True):
+                 apply_lemmatization=True,
+                 add_fraud_indicators=True):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.max_length = max_length
         self.apply_cleaning = apply_cleaning
         self.apply_lemmatization = apply_lemmatization
-        
+        self.add_fraud_indicators = add_fraud_indicators
+        self.cleaner = TextCleaner()
+
     def preprocess_text(self, text: str) -> str:
         if self.apply_cleaning:
-            text = clean_html(text)
-            text = normalize_text(text)
+            text = self.cleaner.clean_text(text)
         if self.apply_lemmatization:
-            text = lemmatize_text(text)
+            text = normalize_text(text)
+
         return text
         
     def __call__(self, text_data: Dict[str, str]) -> Dict[str, torch.Tensor]:
         # Process title and description
-        title = self.preprocess_text(text_data['title'])
-        description = self.preprocess_text(text_data['description'])
-        
-        # Check title-description consistency
-        title_desc_match = check_title_description_match(title, description)
-        
+        title = text_data['title']
+        description = text_data['description']
+
+        # Get suspicious patterns first
+        if self.add_fraud_indicators:
+            checker = BusinessRulesChecker()
+            fraud_indicators = checker(title, description)
+
+        # Process title and description
+        title = self.preprocess_text(title)
+        description = self.preprocess_text(description)
+
         # Tokenize
         title_tokens = self.tokenizer(
             title,
@@ -63,12 +70,13 @@ class TextProcessor:
             max_length=self.max_length,
             return_tensors='pt'
         )
-        
-        return {
+        obj = {
             'title': {k: v.squeeze(0) for k, v in title_tokens.items()},
             'description': {k: v.squeeze(0) for k, v in desc_tokens.items()},
-            'title_desc_match': torch.tensor(title_desc_match, dtype=torch.float32)
         }
+        if self.add_fraud_indicators:
+            obj['fraud_indicators'] = fraud_indicators
+        return obj
 
 class ImageProcessor:
     def __init__(self, 

@@ -22,9 +22,6 @@ def normalize_text(text):
     # Lowercase the text
     text = text.lower()
     
-    # Remove special characters and digits
-    text = re.sub(r'[^a-zA-Z\s]', '', text)
-    
     # Tokenize the text
     words = nltk.word_tokenize(text)
     
