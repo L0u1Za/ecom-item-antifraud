@@ -31,11 +31,36 @@ class TextCleaner:
         """Normalize Unicode characters to their closest ASCII representation"""
         return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII')
     
+    def clean_repeating_chars(self, text: str) -> str:
+        """Clean repeating character sequences"""
+        # Replace repeating punctuation with max 3 occurrences
+        text = re.sub(r'([!?.])\1{2,}', r'\1' * 3, text)
+        # Replace other repeating chars with max 2 occurrences
+        text = re.sub(r'([^!?.])\1{2,}', r'\1\1', text)
+        return text
+
+    def truncate_text(self, text: str, max_length: int) -> str:
+        """Truncate text to max length at word boundary"""
+        if len(text) <= max_length:
+            return text
+        
+        # Try to truncate at last sentence
+        truncated = text[:max_length]
+        last_sentence = re.search(r'.*[.!?]', truncated)
+        if last_sentence:
+            return last_sentence.group(0)
+        
+        # If no sentence boundary, truncate at last word
+        last_word = re.search(r'.*\s', truncated)
+        if last_word:
+            return last_word.group(0)
+        
+        return truncated
+    
     def clean_text(self, 
                   text: str, 
                   remove_stopwords: bool = False,
-                  lemmatize: bool = True,
-                  extract_contacts: bool = True) -> dict:
+                  lemmatize: bool = True) -> dict:
         """
         Clean text with all necessary preprocessing steps
         
@@ -48,9 +73,6 @@ class TextCleaner:
         Returns:
             Dictionary containing cleaned text and extracted information
         """
-        # Store original text for contact extraction
-        original_text = text
-        
         # Clean HTML and normalize spaces
         text = self.clean_html(text)
         

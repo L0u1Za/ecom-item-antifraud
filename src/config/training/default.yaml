@@ -4,6 +4,7 @@ training:
 
   criterion:
     _target_: "torch.nn.BCEWithLogitsLoss"
+    pos_weight: 3.5
 
   optimizer:
     _target_: "torch.optim.Adam"

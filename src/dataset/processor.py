@@ -35,9 +35,12 @@ class TextProcessor:
     def preprocess_text(self, text: str) -> str:
         if self.apply_cleaning:
             text = self.cleaner.clean_text(text)
+            text = self.cleaner.clean_repeating_chars(text)
+            text = self.cleaner.truncate_text(text, self.max_length)
+
         if self.apply_lemmatization:
             text = normalize_text(text)
-
+        
         return text
         
     def __call__(self, text_data: Dict[str, str]) -> Dict[str, torch.Tensor]:
@@ -71,8 +74,10 @@ class TextProcessor:
             return_tensors='pt'
         )
         obj = {
-            'title': {k: v.squeeze(0) for k, v in title_tokens.items()},
-            'description': {k: v.squeeze(0) for k, v in desc_tokens.items()},
+            'title': title,
+            'description': description,
+            'title_embedding': {k: v.squeeze(0) for k, v in title_tokens.items()},
+            'description_embedding': {k: v.squeeze(0) for k, v in desc_tokens.items()},
         }
         if self.add_fraud_indicators:
             obj['fraud_indicators'] = fraud_indicators

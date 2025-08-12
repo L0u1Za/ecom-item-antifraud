@@ -9,7 +9,6 @@ from models.architecture import FraudDetectionModel
 from training.trainer import Trainer
 
 
-
 log = logging.getLogger(__name__)
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
