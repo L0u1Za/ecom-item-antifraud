@@ -9,7 +9,6 @@ from preprocessing.text.normalizer import normalize_text
 from preprocessing.text.business_rules import BusinessRulesChecker
 from preprocessing.text import TextVectorizer
 
-from preprocessing.image.augmentations import *
 from preprocessing.image.clip_validator import CLIPValidator
 
 from preprocessing.tabular import (

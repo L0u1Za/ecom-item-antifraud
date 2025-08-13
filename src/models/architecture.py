@@ -11,18 +11,16 @@ class TextTower(nn.Module):
     def __init__(self, cfg: DictConfig):
         super().__init__()
         self.bert = AutoModel.from_pretrained(cfg.model.text.name)
-        self.title_proj = nn.Linear(self.bert.config.hidden_size, cfg.model.text.projection_dim)
-        self.desc_proj = nn.Linear(self.bert.config.hidden_size, cfg.model.text.projection_dim)
+        self.text_proj = nn.Linear(self.bert.config.hidden_size, cfg.model.text.projection_dim)
+        # Layer normalization for each modality
+        self.text_norm = nn.LayerNorm(cfg.model.text.projection_dim)
+
         self.dropout = nn.Dropout(cfg.model.text.dropout)
         
     def forward(self, text_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-        title_outputs = self.bert(**text_inputs['title'])
-        title_emb = self.dropout(self.title_proj(title_outputs.pooler_output))
-        
-        desc_outputs = self.bert(**text_inputs['description'])
-        desc_emb = self.dropout(self.desc_proj(desc_outputs.pooler_output))
-        
-        text_emb = torch.cat([title_emb, desc_emb], dim=1)
+        text_outputs = self.bert(**text_inputs['text'])
+        text_norm = self.text_norm(self.text_proj(text_outputs.pooler_output))
+        text_emb = self.dropout(text_norm)
         return text_emb
 
 class ImageTower(nn.Module):
@@ -34,11 +32,14 @@ class ImageTower(nn.Module):
             num_classes=0
         )
         self.proj = nn.Linear(self.backbone.num_features, cfg.model.image.projection_dim)
+        # Layer normalization for each modality
+        self.image_norm = nn.LayerNorm(cfg.model.image.projection_dim)
         self.dropout = nn.Dropout(cfg.model.image.dropout)
         
     def forward(self, image_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         img_features = self.backbone(image_inputs['image'])
-        img_emb = self.dropout(self.proj(img_features))
+        img_norm = self.image_norm(self.proj(img_features))
+        img_emb = self.dropout(img_norm)
         return img_emb
 
 class TabularTower(nn.Module):
@@ -48,7 +49,8 @@ class TabularTower(nn.Module):
             nn.Linear(cfg.model.tabular.input_dim, cfg.model.tabular.hidden_dim),
             nn.ReLU(),
             nn.Dropout(cfg.model.tabular.dropout),
-            nn.Linear(cfg.model.tabular.hidden_dim, cfg.model.tabular.projection_dim)
+            nn.Linear(cfg.model.tabular.hidden_dim, cfg.model.tabular.projection_dim),
+            nn.LayerNorm(cfg.model.tabular.projection_dim)
         )
     
     def forward(self, tabular_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:

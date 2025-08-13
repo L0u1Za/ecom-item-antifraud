@@ -17,20 +17,10 @@ class EarlyFusion(nn.Module):
             dropout: Dropout rate
         """
         super().__init__()
-        
-        # Projection layers to common dimension
-        self.text_proj = nn.Linear(input_dims['text'], output_dim)
-        self.image_proj = nn.Linear(input_dims['image'], output_dim)
-        self.tabular_proj = nn.Linear(input_dims['tabular'], output_dim)
-        
-        # Layer normalization for each modality
-        self.text_norm = nn.LayerNorm(output_dim)
-        self.image_norm = nn.LayerNorm(output_dim)
-        self.tabular_norm = nn.LayerNorm(output_dim)
-        
+        input_dim = input_dims['text'] + input_dims['image'] + input_dims['tabular']
         self.dropout = nn.Dropout(dropout)
-        self.fusion_norm = nn.LayerNorm(output_dim * 3)
-        self.output_proj = nn.Linear(output_dim * 3, output_dim)
+        self.fusion_norm = nn.LayerNorm(input_dim)
+        self.output_proj = nn.Linear(input_dim, output_dim)
         
     def forward(self, 
                 text_emb: torch.Tensor,
@@ -47,18 +37,9 @@ class EarlyFusion(nn.Module):
         Returns:
             Fused features [batch_size, output_dim]
         """
-        # Project each modality to same dimension
-        text_proj = self.text_proj(text_emb)
-        image_proj = self.image_proj(image_emb)
-        tabular_proj = self.tabular_proj(tabular_emb)
-        
-        # Apply layer normalization
-        text_norm = self.text_norm(text_proj)
-        image_norm = self.image_norm(image_proj)
-        tabular_norm = self.tabular_norm(tabular_proj)
         
         # Concatenate normalized features
-        fused = torch.cat([text_norm, image_norm, tabular_norm], dim=1)
+        fused = torch.cat([text_emb, image_emb, tabular_emb], dim=1)
         
         # Apply fusion normalization and dropout
         fused = self.fusion_norm(fused)
