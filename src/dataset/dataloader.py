@@ -4,6 +4,7 @@ import hydra
 from omegaconf import DictConfig
 from processor import ImageProcessor, TabularProcessor, TextProcessor
 from fraud_dataset import FraudDataset
+from collator import MultiModalCollator
 
 class DataLoaderFactory:
     @staticmethod
@@ -26,6 +27,8 @@ class DataLoaderFactory:
             image_processor=image_processor,
             tabular_processor=tabular_processor
         )
+        # Create collator
+        collator = MultiModalCollator(config)
         
         # Create dataloaders
         train_loader = DataLoader(
@@ -33,7 +36,8 @@ class DataLoaderFactory:
             batch_size=config.training.batch_size,
             shuffle=True,
             num_workers=config.data.num_workers,
-            pin_memory=True
+            pin_memory=True,
+            collate_fn=collator
         )
         
         val_loader = DataLoader(
@@ -41,7 +45,8 @@ class DataLoaderFactory:
             batch_size=config.training.batch_size,
             shuffle=False,
             num_workers=config.data.num_workers,
-            pin_memory=True
+            pin_memory=True,
+            collate_fn=collator
         )
         
         return {

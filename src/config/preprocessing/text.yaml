@@ -1,7 +1,9 @@
 text:
+# rules
   max_length: 512
   apply_cleaning: true
   apply_lemmatization: true
   add_fraud_indicators: false
-  projection_dim: 256
-  dropout: 0.3
+
+# collator
+  vectorize: false

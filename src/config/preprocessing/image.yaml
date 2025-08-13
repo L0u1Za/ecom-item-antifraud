@@ -1,12 +1,31 @@
 image:
   size: [224, 224]
-  clip_model: "openai/clip-vit-base-patch32"
-  cache_dir: "cache/clip_embeddings"
   
   augmentations:
-    - random_horizontal_flip
-    - random_rotation
-    - color_jitter
+    # Order matters! Start with geometric transforms, then color/intensity
+    - transform:
+        _target_: torchvision.transforms.RandomResizedCrop
+        size: 224
+        scale: [0.8, 1.0]  # Less aggressive cropping for fraud detection
+      probability: 0.5
+      
+    - transform:
+        _target_: torchvision.transforms.RandomHorizontalFlip
+        p: 0.5
+      probability: 0.7
+      
+    - transform:
+        _target_: torchvision.transforms.RandomRotation
+        degrees: 10  # Small rotations to preserve text readability
+      probability: 0.3
+      
+    - transform:
+        _target_: torchvision.transforms.ColorJitter
+        brightness: 0.1
+        contrast: 0.1
+        saturation: 0.1
+        hue: 0.05  # Smaller hue changes to preserve brand colors
+      probability: 0.4
     
   compute_clip_similarity: true
-  cache_embeddings: true
+  clip_model: "openai/clip-vit-base-patch32"

@@ -1,6 +1,7 @@
 model:
   text:
     name: "bert-base-uncased"
+    pretrained: true
     projection_dim: 256
     dropout: 0.3
     

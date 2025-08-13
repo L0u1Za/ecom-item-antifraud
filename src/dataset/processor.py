@@ -1,18 +1,17 @@
 import torch
-from transformers import AutoTokenizer
 from torchvision import transforms
-import numpy as np
 from typing import Dict, Any, List
+import hydra
+from omegaconf import DictConfig
 
 from preprocessing.text.cleaner import TextCleaner
 from preprocessing.text.normalizer import normalize_text
 from preprocessing.text.business_rules import BusinessRulesChecker
+from preprocessing.text import TextVectorizer
 
-from preprocessing.image import (
-    get_image_augmentations,
-    compute_clip_embeddings,
-    compute_image_text_similarity
-)
+from preprocessing.image.augmentations import *
+from preprocessing.image.clip_validator import CLIPValidator
+
 from preprocessing.tabular import (
     encode_metadata,
     scale_numerical_features
@@ -20,12 +19,10 @@ from preprocessing.tabular import (
 
 class TextProcessor:
     def __init__(self,
-                 model_name='bert-base-uncased',
                  max_length=512,
                  apply_cleaning=True,
                  apply_lemmatization=True,
                  add_fraud_indicators=True):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.max_length = max_length
         self.apply_cleaning = apply_cleaning
         self.apply_lemmatization = apply_lemmatization
@@ -57,76 +54,94 @@ class TextProcessor:
         title = self.preprocess_text(title)
         description = self.preprocess_text(description)
 
-        # Tokenize
-        title_tokens = self.tokenizer(
-            title,
-            padding='max_length',
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors='pt'
-        )
-        
-        desc_tokens = self.tokenizer(
-            description,
-            padding='max_length',
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors='pt'
-        )
         obj = {
             'title': title,
-            'description': description,
-            'title_embedding': {k: v.squeeze(0) for k, v in title_tokens.items()},
-            'description_embedding': {k: v.squeeze(0) for k, v in desc_tokens.items()},
+            'description': description
         }
         if self.add_fraud_indicators:
             obj['fraud_indicators'] = fraud_indicators
+
         return obj
 
 class ImageProcessor:
     def __init__(self, 
-                 image_size=224,
-                 clip_model_name="openai/clip-vit-base-patch32",
-                 cache_dir=None):
+                 config: DictConfig,
+                 compute_clip_similarity: bool = False,
+                 clip_model = None,
+                 training=True):
+        """
+        Args:
+            config: Configuration containing image preprocessing settings
+            compute_clip_similarity: Whether to compute CLIP similarity
+            clip_model: CLIP model instance if similarity is enabled
+        """
+        self.config = config
+        self.training = training
+        size = tuple(config.preprocessing.image.size)
+        
+        # Basic transform pipeline
         self.transform = transforms.Compose([
-            transforms.Resize((image_size, image_size)),
+            transforms.Resize(size),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
                               std=[0.229, 0.224, 0.225])
         ])
-        self.augmentations = get_image_augmentations()
-        self.clip_model_name = clip_model_name
-        self.cache_dir = cache_dir
+        
+        # Create augmentation pipeline from config
+        self.augmentations = []
+        if hasattr(config.preprocessing.image, 'augmentations'):
+            for aug_config in config.preprocessing.image.augmentations:
+                # Each augmentation should be fully defined in config
+                aug_transform = hydra.utils.instantiate(
+                    aug_config.transform,
+                    _convert_="partial"
+                )
+                self.augmentations.append((
+                    transforms.Compose([
+                        transforms.Resize(size),
+                        aug_transform,
+                        transforms.ToTensor(),
+                        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                          std=[0.229, 0.224, 0.225])
+                    ]),
+                    aug_config.probability
+                ))
+
+        if compute_clip_similarity:
+            self.clip_validator = CLIPValidator(clip_model, self.transform)
         
     def __call__(self, data: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         image = data['image']
         text = data.get('title', '')  # Get title for CLIP similarity
         
-        # Basic transform
-        img_tensor = self.transform(image)
+        # During training, apply augmentations to create one modified version
+        if self.training and self.augmentations:
+            # Apply augmentations sequentially with their probabilities
+            aug_image = image
+            for aug_transform, prob in self.augmentations:
+                if torch.rand(1).item() < prob:
+                    aug_image = aug_transform(aug_image)
+            
+            # Use augmented image as main input
+            img_tensor = self.transform(aug_image)
+        else:
+            # During inference, just use basic transform
+            img_tensor = self.transform(image)
         
-        # Get augmented versions
-        aug_tensors = [aug(image) for aug in self.augmentations]
         
-        # Compute CLIP embeddings and similarity
-        clip_emb = compute_clip_embeddings(
-            image, 
-            model_name=self.clip_model_name,
-            cache_dir=self.cache_dir
-        )
-        
-        text_img_similarity = compute_image_text_similarity(
-            image, 
-            text, 
-            model_name=self.clip_model_name
-        )
-        
-        return {
-            'image': img_tensor,
-            'augmented_images': torch.stack(aug_tensors),
-            'clip_embedding': clip_emb,
-            'text_image_similarity': text_img_similarity
+        obj = {
+            'image': img_tensor
         }
+        
+        if hasattr(self, 'clip_validator'):
+            # Compute CLIP embeddings and similarity
+            text_img_similarity = self.clip_validator.validate(
+                image,
+                text
+            )
+            obj['text_image_similarity'] = text_img_similarity
+        
+        return obj
 
 class TabularProcessor:
     def __init__(self, 
