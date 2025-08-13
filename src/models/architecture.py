@@ -22,6 +22,16 @@ class TextTower(nn.Module):
         text_norm = self.text_norm(self.text_proj(text_outputs.pooler_output))
         text_emb = self.dropout(text_norm)
         return text_emb
+    
+    def freeze(self):
+        """Freeze all parameters"""
+        for param in self.parameters():
+            param.requires_grad = False
+            
+    def unfreeze(self):
+        """Unfreeze all parameters"""
+        for param in self.parameters():
+            param.requires_grad = True
 
 class ImageTower(nn.Module):
     def __init__(self, cfg: DictConfig):
@@ -41,6 +51,16 @@ class ImageTower(nn.Module):
         img_norm = self.image_norm(self.proj(img_features))
         img_emb = self.dropout(img_norm)
         return img_emb
+    
+    def freeze(self):
+        """Freeze all parameters"""
+        for param in self.parameters():
+            param.requires_grad = False
+            
+    def unfreeze(self):
+        """Unfreeze all parameters"""
+        for param in self.parameters():
+            param.requires_grad = True
 
 class TabularTower(nn.Module):
     def __init__(self, cfg: DictConfig):
@@ -55,6 +75,16 @@ class TabularTower(nn.Module):
     
     def forward(self, tabular_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         return self.encoder(tabular_inputs['tabular_features'])
+    
+    def freeze(self):
+        """Freeze all parameters"""
+        for param in self.parameters():
+            param.requires_grad = False
+            
+    def unfreeze(self):
+        """Unfreeze all parameters"""
+        for param in self.parameters():
+            param.requires_grad = True
 
 @hydra.main(config_path="../../configs", config_name="config")
 class FraudDetectionModel(nn.Module):
@@ -66,7 +96,11 @@ class FraudDetectionModel(nn.Module):
         
         # Load fusion module using Hydra
         self.fusion = hydra.utils.instantiate(cfg.model.fusion)
-        
+        if cfg.model.fusion.type == "early":
+            self.text_tower.freeze()
+            self.image_tower.freeze()
+            self.tabular_tower.freeze()
+
         # Classifier
         self.classifier = nn.Sequential(
             nn.Linear(cfg.model.fusion.output_dim, cfg.model.classifier.hidden_dim),

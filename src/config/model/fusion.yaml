@@ -1,5 +1,5 @@
 fusion:
-  _target_: "models.fusion.early_fusion.EarlyFusion"
+  _target_: "models.fusion.fusion.Fusion"
   type: "early"  # [early, late, gated]
   
   input_dims:

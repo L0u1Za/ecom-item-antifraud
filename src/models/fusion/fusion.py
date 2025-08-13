@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class EarlyFusion(nn.Module):
+class Fusion(nn.Module):
     def __init__(self, 
                  input_dims: dict,
                  output_dim: int,
                  dropout: float = 0.3):
         """
-        Early fusion module that projects features to same dimension and applies normalization.
+        Fusion module that projects features to same dimension and applies normalization.
         
         Args:
             input_dims: Dictionary with dimension sizes for each modality
@@ -27,7 +27,7 @@ class EarlyFusion(nn.Module):
                 image_emb: torch.Tensor,
                 tabular_emb: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass for early fusion.
+        Forward pass for Fusion.
         
         Args:
             text_emb: Text embeddings [batch_size, text_dim]
