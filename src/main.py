@@ -29,7 +29,8 @@ def main(cfg: DictConfig) -> None:
     processors = {
         'text': TextProcessor(**cfg.preprocessing.text),
         'image': ImageProcessor(**cfg.preprocessing.image),
-        'tabular': TabularProcessor(**cfg.preprocessing.tabular)
+        'tabular': TabularProcessor(**cfg.preprocessing.tabular),
+        'image_test': ImageProcessor(**cfg.preprocessing.image, training=False),
     }
 
     # Create dataloaders using factory

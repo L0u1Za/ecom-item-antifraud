@@ -12,7 +12,8 @@ class DataLoaderFactory:
         config: DictConfig,
         text_processor: Optional[TextProcessor] = None,
         image_processor: Optional[ImageProcessor] = None,
-        tabular_processor: Optional[TabularProcessor] = None
+        tabular_processor: Optional[TabularProcessor] = None,
+        image_processor_test: Optional[ImageProcessor] = None
     ) -> Dict[str, DataLoader]:
         
         # Create datasets
@@ -24,7 +25,7 @@ class DataLoaderFactory:
         
         val_dataset = FraudDataset(
             text_processor=text_processor,
-            image_processor=image_processor,
+            image_processor=image_processor_test,
             tabular_processor=tabular_processor
         )
         # Create collator

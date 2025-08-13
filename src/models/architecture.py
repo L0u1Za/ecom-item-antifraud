@@ -18,19 +18,19 @@ class TextTower(nn.Module):
         self.dropout = nn.Dropout(cfg.model.text.dropout)
         
     def forward(self, text_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-        text_outputs = self.bert(**text_inputs['text'])
+        text_outputs = self.bert(**text_inputs)
         text_norm = self.text_norm(self.text_proj(text_outputs.pooler_output))
         text_emb = self.dropout(text_norm)
         return text_emb
     
     def freeze(self):
         """Freeze all parameters"""
-        for param in self.parameters():
+        for param in self.bert.parameters():
             param.requires_grad = False
             
     def unfreeze(self):
         """Unfreeze all parameters"""
-        for param in self.parameters():
+        for param in self.bert.parameters():
             param.requires_grad = True
 
 class ImageTower(nn.Module):
@@ -42,24 +42,52 @@ class ImageTower(nn.Module):
             num_classes=0
         )
         self.proj = nn.Linear(self.backbone.num_features, cfg.model.image.projection_dim)
-        # Layer normalization for each modality
         self.image_norm = nn.LayerNorm(cfg.model.image.projection_dim)
         self.dropout = nn.Dropout(cfg.model.image.dropout)
         
-    def forward(self, image_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-        img_features = self.backbone(image_inputs['image'])
-        img_norm = self.image_norm(self.proj(img_features))
-        img_emb = self.dropout(img_norm)
+        # Add sequence handling
+        self.seq_pool = nn.Sequential(
+            nn.Linear(cfg.model.image.projection_dim, cfg.model.image.projection_dim),
+            nn.LayerNorm(cfg.model.image.projection_dim),
+            nn.ReLU(),
+            nn.Dropout(cfg.model.image.dropout)
+        ) if cfg.model.image.get('pool_type', 'mean') == 'learned' else None
+        
+    def forward(self, image_inputs: torch.Tensor) -> torch.Tensor:
+        # image_inputs['image'] shape: [batch_size, num_images, channels, height, width]
+        B, N, C, H, W = image_inputs.shape
+        
+        # Reshape to process all images
+        images = image_inputs.view(B * N, C, H, W)
+        
+        # Extract features for all images
+        features = self.backbone(images)  # [B*N, backbone_dim]
+        projected = self.proj(features)   # [B*N, proj_dim]
+        normalized = self.image_norm(projected)
+        img_emb = self.dropout(normalized)
+        
+        # Reshape back to [batch_size, num_images, proj_dim]
+        img_emb = img_emb.view(B, N, -1)
+        
+        # Pool image sequence
+        if self.seq_pool is not None:
+            # Learned pooling
+            pooled = self.seq_pool(img_emb)
+            img_emb = pooled.mean(dim=1)  # [B, proj_dim]
+        else:
+            # Simple mean pooling
+            img_emb = img_emb.mean(dim=1)  # [B, proj_dim]
+            
         return img_emb
     
     def freeze(self):
         """Freeze all parameters"""
-        for param in self.parameters():
+        for param in self.backbone.parameters():
             param.requires_grad = False
             
     def unfreeze(self):
         """Unfreeze all parameters"""
-        for param in self.parameters():
+        for param in self.backbone.parameters():
             param.requires_grad = True
 
 class TabularTower(nn.Module):
@@ -73,18 +101,18 @@ class TabularTower(nn.Module):
             nn.LayerNorm(cfg.model.tabular.projection_dim)
         )
     
-    def forward(self, tabular_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
-        return self.encoder(tabular_inputs['tabular_features'])
+    def forward(self, tabular_inputs: torch.Tensor) -> torch.Tensor:
+        return self.encoder(tabular_inputs)
     
     def freeze(self):
         """Freeze all parameters"""
-        for param in self.parameters():
-            param.requires_grad = False
+        #for param in self.parameters():
+        #    param.requires_grad = False
             
     def unfreeze(self):
         """Unfreeze all parameters"""
-        for param in self.parameters():
-            param.requires_grad = True
+        #for param in self.parameters():
+        #    param.requires_grad = True
 
 @hydra.main(config_path="../../configs", config_name="config")
 class FraudDetectionModel(nn.Module):
@@ -111,7 +139,7 @@ class FraudDetectionModel(nn.Module):
 
     def forward(self, batch: Dict[str, Dict[str, torch.Tensor]]) -> Tuple[torch.Tensor, Dict]:
         text_emb = self.text_tower(batch['text'])
-        image_emb = self.image_tower(batch['image'])
+        image_emb = self.image_tower(batch['images'])
         tabular_emb = self.tabular_tower(batch['tabular'])
         
         fused_features = self.fusion(

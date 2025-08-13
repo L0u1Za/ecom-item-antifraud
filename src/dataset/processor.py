@@ -110,26 +110,28 @@ class ImageProcessor:
             self.clip_validator = CLIPValidator(clip_model, self.transform)
         
     def __call__(self, data: Dict[str, Any]) -> Dict[str, torch.Tensor]:
-        image = data['image']
+        images = data['images']
         text = data.get('title', '')  # Get title for CLIP similarity
         
         # During training, apply augmentations to create one modified version
-        if self.training and self.augmentations:
-            # Apply augmentations sequentially with their probabilities
-            aug_image = image
-            for aug_transform, prob in self.augmentations:
-                if torch.rand(1).item() < prob:
-                    aug_image = aug_transform(aug_image)
-            
-            # Use augmented image as main input
-            img_tensor = self.transform(aug_image)
-        else:
-            # During inference, just use basic transform
-            img_tensor = self.transform(image)
-        
+        img_tensors = []
+        for image in images:
+            if self.training and self.augmentations:
+                # Apply augmentations sequentially with their probabilities
+                aug_image = image
+                for aug_transform, prob in self.augmentations:
+                    if torch.rand(1).item() < prob:
+                        aug_image = aug_transform(aug_image)
+                
+                # Use augmented image as main input
+                img_tensor = self.transform(aug_image)
+            else:
+                # During inference, just use basic transform
+                img_tensor = self.transform(image)
+            img_tensors.append(img_tensor)
         
         obj = {
-            'image': img_tensor
+            'images': img_tensors
         }
         
         if hasattr(self, 'clip_validator'):

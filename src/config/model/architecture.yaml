@@ -8,6 +8,7 @@ model:
   image:
     name: "resnet50"
     pretrained: true
+    pool_type: learned
     projection_dim: 256
     dropout: 0.3
     

@@ -39,7 +39,7 @@ class MultiModalCollator:
         """
         # Separate modalities
         text_samples = [b['text'] for b in batch]
-        image_samples = [b['image'] for b in batch]
+        image_samples = [b['images'] for b in batch]
         tabular_samples = [b['tabular'] for b in batch]
         
         # Process text
@@ -56,9 +56,25 @@ class MultiModalCollator:
             return_tensors='pt'
         )
         
+        max_num_images = max(len(item['images']) for item in image_samples)
+        image_shape = self.config.preprocessing.image.size
+        
         # Process images (already tensors from ImageProcessor)
-        images = torch.stack([img['image'] for img in image_samples])
-            
+        # images = torch.stack([images['images'] for images in image_samples])
+        # Pad images with zeros to match max_num_images
+        padded_images = []
+        for item in image_samples:
+            imgs = item['images']
+            if len(imgs) < max_num_images:
+                pad_count = max_num_images - len(imgs)
+                imgs = imgs + [torch.zeros(image_shape)] * pad_count
+            elif len(imgs) > max_num_images:
+                imgs = imgs[:max_num_images]  # optional truncate
+            padded_images.append(torch.stack(imgs))  # shape: [max_num_images, C, H, W]
+
+        # Final stacked tensor: [batch_size, max_num_images, C, H, W]
+        images = torch.stack(padded_images)
+
         # Process tabular features (already tensors)
         tabular = torch.stack([t['features'] for t in tabular_samples])
         
@@ -86,9 +102,7 @@ class MultiModalCollator:
                 'attention_mask': encoded_text['attention_mask'],
                 'token_type_ids': encoded_text.get('token_type_ids')
             },
-            'image': {
-                'pixels': images
-            },
+            'images': images,
             'tabular': tabular
         }
 

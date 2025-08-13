@@ -18,9 +18,8 @@ class FraudDataset(Dataset):
         item = self.data[idx]
         
         processed = {
-            'title': self.text_processor(item['title']) if self.text_processor else None,
-            'description': self.text_processor(item['description']) if self.text_processor else None,
-            'image': self.image_processor(item['image']) if self.image_processor else None,
+            'text': self.text_processor({'title': item['title'], 'description': item['description']}) if self.text_processor else None,
+            'images': self.image_processor(item['images']) if self.image_processor else None,
             'tabular': self.tabular_processor(item['tabular']) if self.tabular_processor else None
         }
         
