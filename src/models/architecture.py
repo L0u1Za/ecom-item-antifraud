@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 from transformers import AutoModel
 import timm
 import hydra
@@ -110,7 +110,7 @@ class TabularTower(nn.Module):
 
 @hydra.main(config_path="../../configs", config_name="config")
 class FraudDetectionModel(nn.Module):
-    def __init__(self, cfg: DictConfig):
+    def __init__(self, cfg: DictConfig, training=True):
         super().__init__()
         
         fusion_emb_size = 0
@@ -135,16 +135,66 @@ class FraudDetectionModel(nn.Module):
             nn.Dropout(cfg.model.classifier.dropout),
             nn.Linear(cfg.model.classifier.hidden_dim, 1)
         )
+        
+        # Modality dropout for training robustness
+        self.modality_dropout = cfg.model.get('modality_dropout', 0.0)
+        self.training = training
+
+    def _apply_modality_dropout(self, embeds: list, batch_size: int) -> list:
+        """
+        Apply modality dropout during training to randomly disable enabled modalities.
+        Only applies to modalities that are already enabled in the config.
+        During training, randomly masks some enabled modality embeddings to zero.
+        
+        Args:
+            embeds: List of modality embeddings (only for enabled modalities)
+            batch_size: Batch size for creating dropout masks
+            
+        Returns:
+            List of embeddings with some potentially zeroed out during training
+        """
+        if not self.training or self.modality_dropout == 0.0:
+            return embeds
+            
+        # Create dropout mask for each enabled modality
+        dropout_masks = []
+        for embed in embeds:
+            # Create mask: 1 means keep, 0 means drop
+            # Single mask per modality: either all zeros or all ones
+            mask = torch.bernoulli(torch.tensor([1 - self.modality_dropout]))
+            mask = mask.to(embed.device)
+            # Expand mask to match embedding dimensions: [1] -> [batch_size, 1] -> [batch_size, embed_dim]
+            mask = mask.expand(batch_size, 1).expand_as(embed)
+            dropout_masks.append(mask)
+        
+        # Apply masks to enabled modalities
+        dropped_embeds = []
+        for embed, mask in zip(embeds, dropout_masks):
+            if embed is not None and mask is not None:
+                dropped_embeds.append(embed * mask)  # Apply dropout mask
+            else:
+                dropped_embeds.append(embed)
+                
+        return dropped_embeds
 
     def forward(self, batch: Dict[str, Dict[str, torch.Tensor]]) -> Tuple[torch.Tensor, Dict]:
         embeds = []
+        batch_size = None
+        
+        # Collect embeddings from enabled modalities only
         if hasattr(self, 'text_tower'):
             embeds.append(self.text_tower(batch['text']))
+            batch_size = batch['text'].shape[0]
         if hasattr(self, 'image_tower'):
             embeds.append(self.image_tower(batch['images']))
+            batch_size = batch['images'].shape[0]
         if hasattr(self, 'tabular_tower'):
             embeds.append(self.tabular_tower(batch['tabular']))
-        
+            batch_size = batch['tabular'].shape[0]
+
+        # Apply modality dropout during training only - randomly mask enabled modalities
+        embeds = self._apply_modality_dropout(embeds, batch_size)
+        # All embeddings should now be valid tensors for enabled modalities
         fused_features = self.fusion(embeds)
         
         logits = self.classifier(fused_features)

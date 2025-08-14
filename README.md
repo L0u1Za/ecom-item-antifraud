@@ -36,6 +36,8 @@ This project aims to detect fraudulent items in e-commerce platforms by analyzin
 │   └── experiments.ipynb
 ├── tests
 │   └── test_pipeline.py
+├── examples
+│   └── modality_dropout_demo.py
 ├── requirements.txt
 └── README.md
 ```

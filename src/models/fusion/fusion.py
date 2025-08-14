@@ -13,8 +13,7 @@ class Fusion(nn.Module):
         Fusion module that projects features to same dimension and applies normalization.
         
         Args:
-            input_dims: Dictionary with dimension sizes for each modality
-                       {'text': dim1, 'image': dim2, 'tabular': dim3}
+            input_dim: Total dimension size after concatenating all modalities
             output_dim: Dimension of the output fused features
             dropout: Dropout rate
         """
@@ -30,15 +29,21 @@ class Fusion(nn.Module):
         Forward pass for Fusion.
         
         Args:
-            text_emb: Text embeddings [batch_size, text_dim]
-            image_emb: Image embeddings [batch_size, image_dim]
-            tabular_emb: Tabular embeddings [batch_size, tabular_dim]
+            embeds: List of modality embeddings, each of shape [batch_size, modality_dim]
+                   Order depends on which modalities are enabled in configuration
             
         Returns:
             Fused features [batch_size, output_dim]
         """
+        if not embeds:
+            raise ValueError("No embeddings provided to fusion module")
         
-        # Concatenate normalized features
+        # Validate all embeddings have the same batch size
+        batch_sizes = [emb.shape[0] for emb in embeds]
+        if len(set(batch_sizes)) > 1:
+            raise ValueError(f"All embeddings must have the same batch size. Got: {batch_sizes}")
+        
+        # Concatenate all modality embeddings
         fused = torch.cat(embeds, dim=1)
         
         # Apply fusion normalization and dropout

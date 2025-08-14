@@ -24,3 +24,6 @@ model:
   classifier:
     hidden_dim: 512
     dropout: 0.5
+    
+  # Modality dropout for training robustness
+  modality_dropout: 0.0  # Dropout rate for train (0.0 = no dropout)
