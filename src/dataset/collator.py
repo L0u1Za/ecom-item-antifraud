@@ -94,7 +94,13 @@ class MultiModalCollator:
                 fraud_tensor = torch.stack(fraud_indicators)
                 # Optionally concatenate with tabular features
                 tabular = torch.cat([tabular, fraud_tensor], dim=1)
-                
+        
+        if self.config.preprocessing.image.compute_clip_similarity:
+            clip_similarities = [item['text_image_similarity'] for item in image_samples]
+            clip_similarities = torch.stack(clip_similarities)
+            
+            tabular = torch.cat([tabular, fraud_tensor], dim=1)
+        
         # Construct final batch
         batch_dict = {
             'text': {

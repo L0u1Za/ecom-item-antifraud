@@ -1,11 +1,13 @@
 model:
   text:
+    enabled: true
     name: "bert-base-uncased"
     pretrained: true
     projection_dim: 256
     dropout: 0.3
     
   image:
+    enabled: true
     name: "resnet50"
     pretrained: true
     pool_type: learned
@@ -13,6 +15,7 @@ model:
     dropout: 0.3
     
   tabular:
+    enabled: true
     input_dim: 128
     hidden_dim: 256
     projection_dim: 256

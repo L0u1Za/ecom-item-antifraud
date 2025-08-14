@@ -10,7 +10,7 @@ class WandBLogger:
         """
         self.config = config or {}
         wandb.init(project=project_name, config=self.config)
-    
+
     def watch_model(self, model):
         """Watch model gradients"""
         wandb.watch(model)

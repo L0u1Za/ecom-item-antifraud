@@ -12,7 +12,7 @@ image:
     - transform:
         _target_: torchvision.transforms.RandomHorizontalFlip
         p: 0.5
-      probability: 0.7
+      probability: 0.1
       
     - transform:
         _target_: torchvision.transforms.RandomRotation
@@ -25,7 +25,7 @@ image:
         contrast: 0.1
         saturation: 0.1
         hue: 0.05  # Smaller hue changes to preserve brand colors
-      probability: 0.4
+      probability: 0.3
     
   compute_clip_similarity: true
   clip_model: "openai/clip-vit-base-patch32"

@@ -38,7 +38,8 @@ def main(cfg: DictConfig) -> None:
         config=cfg,
         text_processor=processors['text'],
         image_processor=processors['image'],
-        tabular_processor=processors['tabular']
+        tabular_processor=processors['tabular'],
+        image_processor_test=processors['image_test']
     )
 
     # Initialize model

@@ -2,9 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from typing import List
+
 class Fusion(nn.Module):
     def __init__(self, 
-                 input_dims: dict,
+                 input_dim: int,
                  output_dim: int,
                  dropout: float = 0.3):
         """
@@ -17,15 +19,13 @@ class Fusion(nn.Module):
             dropout: Dropout rate
         """
         super().__init__()
-        input_dim = input_dims['text'] + input_dims['image'] + input_dims['tabular']
         self.dropout = nn.Dropout(dropout)
         self.fusion_norm = nn.LayerNorm(input_dim)
         self.output_proj = nn.Linear(input_dim, output_dim)
         
     def forward(self, 
-                text_emb: torch.Tensor,
-                image_emb: torch.Tensor,
-                tabular_emb: torch.Tensor) -> torch.Tensor:
+                embeds: List[torch.Tensor]
+                ) -> torch.Tensor:
         """
         Forward pass for Fusion.
         
@@ -39,7 +39,7 @@ class Fusion(nn.Module):
         """
         
         # Concatenate normalized features
-        fused = torch.cat([text_emb, image_emb, tabular_emb], dim=1)
+        fused = torch.cat(embeds, dim=1)
         
         # Apply fusion normalization and dropout
         fused = self.fusion_norm(fused)

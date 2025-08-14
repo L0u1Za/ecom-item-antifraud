@@ -17,6 +17,8 @@ class TextTower(nn.Module):
 
         self.dropout = nn.Dropout(cfg.model.text.dropout)
         
+        self.freeze()
+        
     def forward(self, text_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         text_outputs = self.bert(**text_inputs)
         text_norm = self.text_norm(self.text_proj(text_outputs.pooler_output))
@@ -52,6 +54,8 @@ class ImageTower(nn.Module):
             nn.ReLU(),
             nn.Dropout(cfg.model.image.dropout)
         ) if cfg.model.image.get('pool_type', 'mean') == 'learned' else None
+        
+        self.freeze()
         
     def forward(self, image_inputs: torch.Tensor) -> torch.Tensor:
         # image_inputs['image'] shape: [batch_size, num_images, channels, height, width]
@@ -103,31 +107,26 @@ class TabularTower(nn.Module):
     
     def forward(self, tabular_inputs: torch.Tensor) -> torch.Tensor:
         return self.encoder(tabular_inputs)
-    
-    def freeze(self):
-        """Freeze all parameters"""
-        #for param in self.parameters():
-        #    param.requires_grad = False
-            
-    def unfreeze(self):
-        """Unfreeze all parameters"""
-        #for param in self.parameters():
-        #    param.requires_grad = True
 
 @hydra.main(config_path="../../configs", config_name="config")
 class FraudDetectionModel(nn.Module):
     def __init__(self, cfg: DictConfig):
         super().__init__()
-        self.text_tower = TextTower(cfg)
-        self.image_tower = ImageTower(cfg)
-        self.tabular_tower = TabularTower(cfg)
+        
+        fusion_emb_size = 0
+        
+        if cfg.model.text.enabled:
+            self.text_tower = TextTower(cfg)
+            fusion_emb_size += cfg.model.text.projection_dim
+        if cfg.model.image.enabled:
+            self.image_tower = ImageTower(cfg)
+            fusion_emb_size += cfg.model.image.projection_dim
+        if cfg.model.tabular.enabled:
+            self.tabular_tower = TabularTower(cfg)
+            fusion_emb_size += cfg.model.tabular.projection_dim
         
         # Load fusion module using Hydra
-        self.fusion = hydra.utils.instantiate(cfg.model.fusion)
-        if cfg.model.fusion.type == "early":
-            self.text_tower.freeze()
-            self.image_tower.freeze()
-            self.tabular_tower.freeze()
+        self.fusion = hydra.utils.instantiate(cfg.model.fusion, input_dim=fusion_emb_size)
 
         # Classifier
         self.classifier = nn.Sequential(
@@ -138,22 +137,20 @@ class FraudDetectionModel(nn.Module):
         )
 
     def forward(self, batch: Dict[str, Dict[str, torch.Tensor]]) -> Tuple[torch.Tensor, Dict]:
-        text_emb = self.text_tower(batch['text'])
-        image_emb = self.image_tower(batch['images'])
-        tabular_emb = self.tabular_tower(batch['tabular'])
+        embeds = []
+        if hasattr(self, 'text_tower'):
+            embeds.append(self.text_tower(batch['text']))
+        if hasattr(self, 'image_tower'):
+            embeds.append(self.image_tower(batch['images']))
+        if hasattr(self, 'tabular_tower'):
+            embeds.append(self.tabular_tower(batch['tabular']))
         
-        fused_features = self.fusion(
-            text_emb=text_emb,
-            image_emb=image_emb,
-            tabular_emb=tabular_emb
-        )
+        fused_features = self.fusion(embeds)
         
         logits = self.classifier(fused_features)
         
         return logits, {
-            'text_emb': text_emb,
-            'image_emb': image_emb,
-            'tabular_emb': tabular_emb,
+            'embeds': embeds,
             'fused_features': fused_features
         }
 
