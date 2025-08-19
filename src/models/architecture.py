@@ -6,7 +6,7 @@ from transformers import AutoModel
 import timm
 import hydra
 from omegaconf import DictConfig
-from tab_transformer_pytorch import FTTransformer
+from models.ft_transformer import FTTransformer
 
 class TextTower(nn.Module):
     def __init__(self, cfg: DictConfig):
