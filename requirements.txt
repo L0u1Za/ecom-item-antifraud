@@ -3,13 +3,13 @@ pandas
 scikit-learn
 # torch
 # torchvision
-transformers
+# transformers
 wandb
 opencv-python
 Pillow
 tqdm
 optuna
-timm
+# timm
 #tab-transformer-pytorch
 hyper_connections
 einops
