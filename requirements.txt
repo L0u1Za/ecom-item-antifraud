@@ -9,6 +9,6 @@ opencv-python
 Pillow
 tqdm
 optuna
-hydra
 timm
 tab-transformer-pytorch
+hydra-core

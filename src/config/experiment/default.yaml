@@ -9,7 +9,7 @@ wandb:
 data:
   train_path: "data/train.csv"
   val_path: "data/val.csv"
-  test_path: "dafa/test_prepared.csv"
+  test_path: "data/test_prepared.csv"
   num_workers: 4
   
 checkpointing:

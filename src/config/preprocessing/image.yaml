@@ -28,5 +28,5 @@ augmentations:
       hue: 0.05  # Smaller hue changes to preserve brand colors
     probability: 0.3
   
-compute_clip_similarity: true
+compute_clip_similarity: false
 clip_model: "openai/clip-vit-base-patch32"
