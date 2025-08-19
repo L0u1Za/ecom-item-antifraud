@@ -1,7 +1,7 @@
 model:
   text:
     enabled: true
-    name: "cointegrated/rubert-tiny"
+    name: "cointegrated/rubert-tiny2"
     pretrained: true
     projection_dim: 256
     dropout: 0.3
@@ -20,7 +20,7 @@ model:
     categories: []         # to be filled at runtime from TabularProcessor.fit()
     num_continuous: 0      # to be filled at runtime from TabularProcessor.fit()
     dim: 32
-    projection_dim: 256    # FTTransformer dim_out
+    projection_dim: 64    # FTTransformer dim_out
     depth: 6
     heads: 8
     attn_dropout: 0.1
@@ -28,7 +28,7 @@ model:
     
   classifier:
     hidden_dim: 512
-    dropout: 0.5
+    dropout: 0.3
     
   # Modality dropout for training robustness
   modality_dropout: 0.0  # Dropout rate for train (0.0 = no dropout)
@@ -38,7 +38,7 @@ fusion:
   _target_: "models.fusion.fusion.Fusion"
   type: "early"  # [early, late, gated]
     
-  output_dim: 768
+  output_dim: 256
   dropout: 0.3
   
 #  gating:

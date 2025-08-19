@@ -1,5 +1,5 @@
 epochs: 100
-batch_size: 32
+batch_size: 64
 
 criterion:
   _target_: "torch.nn.BCEWithLogitsLoss"
@@ -13,9 +13,9 @@ optimizer:
 
 scheduler:
   _target_: "torch.optim.lr_scheduler.ReduceLROnPlateau"
-  mode: "min"
-  factor: 0.1
-  patience: 10
+  mode: "max"
+  factor: 0.5
+  patience: 3
 
 #early_stopping:
 #  patience: 10
