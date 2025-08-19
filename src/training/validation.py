@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from tqdm import tqdm
 
 class Validator:
     def __init__(self, model, dataloader, device, criterion, threshold=0.5):
@@ -10,11 +11,12 @@ class Validator:
         self.threshold = threshold
         self.criterion = criterion
 
-    def validate(self, threshold=None):
+    def validate(self, threshold=None, show_progress=False):
         """
         Validate model with specified threshold
         Args:
             threshold: Optional override for instance threshold
+            show_progress: If True, shows a tqdm progress bar for validation
         Returns:
             Dictionary containing metrics including loss
         """
@@ -24,10 +26,12 @@ class Validator:
         self.model.eval()
         all_probs = []
         all_labels = []
-        total_loss = 0
+        total_loss = 0.0
+
+        iterator = tqdm(self.dataloader, desc="Validation", leave=False) if show_progress else self.dataloader
 
         with torch.no_grad():
-            for data in self.dataloader:
+            for data in iterator:
                 inputs, labels = data
                 # Move nested dict to device
                 def move_to_device(x):
@@ -45,6 +49,8 @@ class Validator:
                 # Calculate loss
                 loss = self.criterion(outputs.squeeze(-1), labels)
                 total_loss += loss.item()
+                if show_progress:
+                    iterator.set_postfix(loss=f"{loss.item():.4f}")
 
                 all_probs.extend(probabilities.cpu().numpy())
                 all_labels.extend(labels.cpu().numpy())
@@ -52,10 +58,10 @@ class Validator:
         # Convert to numpy arrays
         all_probs = np.array(all_probs)
         all_labels = np.array(all_labels)
-        
-         # Calculate average loss
+
+            # Calculate average loss
         avg_loss = total_loss / len(self.dataloader)
-        
+
         # Apply threshold to get predictions
         predictions = (all_probs >= self.threshold).astype(int)
 

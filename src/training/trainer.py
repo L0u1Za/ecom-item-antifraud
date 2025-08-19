@@ -7,6 +7,8 @@ from training.validation import Validator
 from utils.logger import setup_logger
 from pathlib import Path
 from omegaconf import DictConfig
+from tqdm import tqdm
+import time
 
 class Trainer:
     def __init__(self, 
@@ -30,13 +32,12 @@ class Trainer:
         self.logger = setup_logger('fraud_detection', 'fraud_detection.log')
         
         # Initialize validator
-        self.config = config
         self.validator = Validator(
             model=model,
             dataloader=val_loader,
             device=device,
             criterion=criterion,
-            threshold=config.training.validation.threshold
+            threshold=config.training.validation.threshold  # Initial threshold, can be optimized during training
         )
         
         if config.experiment.wandb.enabled == True:
@@ -103,11 +104,15 @@ class Trainer:
     def train(self):
         self.model.to(self.device)
         best_val_loss = float('inf')
-        
+
         for epoch in range(self.epochs):
             self.model.train()
-            total_loss = 0
-            for batch_idx, batch in enumerate(self.train_loader):
+            epoch_start = time.time()
+            total_loss = 0.0
+            running = 0.0
+
+            pbar = tqdm(self.train_loader, desc=f"Epoch {epoch+1}/{self.epochs}", leave=False)
+            for batch_idx, batch in enumerate(pbar):
                 inputs, labels = batch
                 # Move batch dict recursively to device
                 def move_to_device(x):
@@ -126,6 +131,9 @@ class Trainer:
                 self.optimizer.step()
 
                 total_loss += loss.item()
+                running = total_loss / (batch_idx + 1)
+                current_lr = self.optimizer.param_groups[0]['lr']
+                pbar.set_postfix(loss=f"{loss.item():.4f}", avg=f"{running:.4f}", lr=f"{current_lr:.2e}")
 
                 # Log batch metrics
                 if hasattr(self, 'wandb_logger') and batch_idx % 100 == 0:  # Log every 100 batches
@@ -135,14 +143,21 @@ class Trainer:
                         batch_size=len(self.train_loader),
                         loss=loss.item()
                     )
+            pbar.close()
 
             avg_loss = total_loss / len(self.train_loader)
-            self.logger.log_epoch(epoch, avg_loss)
+            self.logger.info(f"Epoch {epoch+1} train_loss={avg_loss:.4f} time={(time.time()-epoch_start):.1f}s")
 
-            # Validation
-            val_metrics = self.validator.validate()
+            # Validation with progress bar
+            val_metrics = self.validator.validate(show_progress=True)
             val_loss = val_metrics.pop('loss', float('inf'))
-            self.logger.log_validation(epoch, val_loss, val_metrics['f1_score'])
+            self.logger.info(
+                f"Epoch {epoch+1} val_loss={val_loss:.4f} "
+                f"acc={val_metrics.get('accuracy', 0):.4f} "
+                f"prec={val_metrics.get('precision', 0):.4f} "
+                f"rec={val_metrics.get('recall', 0):.4f} "
+                f"f1={val_metrics.get('f1_score', 0):.4f}"
+            )
 
             if hasattr(self, 'wandb_logger'):
                 current_lr = self.optimizer.param_groups[0]['lr']
@@ -155,18 +170,18 @@ class Trainer:
                 }
                 self.wandb_logger.log_epoch(epoch, metrics)
 
-             # Step scheduler
+                # Step scheduler
             if self.scheduler is not None:
                 if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                     self.scheduler.step(val_loss)
                 else:
                     self.scheduler.step()
-            
+
             # Save checkpoints
             is_best = val_loss < best_val_loss
             if is_best:
                 best_val_loss = val_loss
-            
+
             self.save_checkpoint(
                 model_state=self.model.state_dict(),
                 is_best=is_best,

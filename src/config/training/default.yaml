@@ -1,5 +1,5 @@
 epochs: 100
-batch_size: 4 # 32
+batch_size: 32
 
 criterion:
   _target_: "torch.nn.BCEWithLogitsLoss"
