@@ -8,7 +8,8 @@ class Fusion(nn.Module):
     def __init__(self, 
                  input_dim: int,
                  output_dim: int,
-                 dropout: float = 0.3):
+                 dropout: float = 0.3,
+                 type="early"):
         """
         Fusion module that projects features to same dimension and applies normalization.
         

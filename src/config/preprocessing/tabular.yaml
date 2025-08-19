@@ -1,14 +1,57 @@
-tabular:
-  categorical_cols:
-    - category
-    - brand
-    - condition
-    
-  numerical_cols:
-    - price
-    - quantity
-    - rating
-    
-  encoding: "label"
-  scaling: "standard"
-  input_dim: 128
+# @package preprocessing.tabular
+
+categorical_cols:
+  - brand_name
+  - CommercialTypeName4
+  
+numerical_cols:
+  - rating_1_count
+  - rating_2_count
+  - rating_3_count
+  - rating_4_count
+  - rating_5_count
+  - comments_published_count
+  - photos_published_count
+  - videos_published_count
+  - PriceDiscounted
+  - item_time_alive
+  - item_count_fake_returns7
+  - item_count_fake_returns30
+  - item_count_fake_returns90
+  - item_count_sales7
+  - item_count_sales30
+  - item_count_sales90
+  - item_count_returns7
+  - item_count_returns30
+  - item_count_returns90
+  - GmvTotal7
+  - GmvTotal30
+  - GmvTotal90
+  - ExemplarAcceptedCountTotal7
+  - ExemplarAcceptedCountTotal30
+  - ExemplarAcceptedCountTotal90
+  - OrderAcceptedCountTotal7
+  - OrderAcceptedCountTotal30
+  - OrderAcceptedCountTotal90
+  - ExemplarReturnedCountTotal7
+  - ExemplarReturnedCountTotal30
+  - ExemplarReturnedCountTotal90
+  - ExemplarReturnedValueTotal7
+  - ExemplarReturnedValueTotal30
+  - ExemplarReturnedValueTotal90
+  - ItemVarietyCount
+  - ItemAvailableCount
+  - seller_time_alive
+  - return_rate_30
+  - fake_return_rate_30
+  - refund_value_ratio_30
+  - sales_growth_7_30
+  - sales_growth_30_90
+  - sales_velocity
+  - seller_velocity
+  - desc_len
+  - desc_word_count
+  - name_len
+  - price_return_interaction
+  - gmv_per_day
+scaling: "standard"

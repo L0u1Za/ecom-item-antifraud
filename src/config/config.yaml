@@ -1,9 +1,8 @@
 defaults:
-  - preprocessing: text
-  - preprocessing: image
-  - preprocessing: tabular
+  - preprocessing@preprocessing.text: text
+  - preprocessing@preprocessing.image: image
+  - preprocessing@preprocessing.tabular: tabular
   - model: architecture
-  - model: fusion
   - training: default
   - experiment: default
   - _self_

@@ -29,14 +29,21 @@ class Validator:
         with torch.no_grad():
             for data in self.dataloader:
                 inputs, labels = data
-                inputs = inputs.to(self.device)
+                # Move nested dict to device
+                def move_to_device(x):
+                    if isinstance(x, dict):
+                        return {k: move_to_device(v) for k, v in x.items()}
+                    if hasattr(x, 'to'):
+                        return x.to(self.device)
+                    return x
+                inputs = move_to_device(inputs)
                 labels = labels.to(self.device)
 
-                outputs = self.model(inputs)
-                probabilities = torch.sigmoid(outputs)  # For binary classification
+                outputs, _ = self.model(inputs)
+                probabilities = torch.sigmoid(outputs.squeeze(-1))  # For binary classification
 
                 # Calculate loss
-                loss = self.criterion(outputs, labels)
+                loss = self.criterion(outputs.squeeze(-1), labels)
                 total_loss += loss.item()
 
                 all_probs.extend(probabilities.cpu().numpy())

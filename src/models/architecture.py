@@ -6,6 +6,7 @@ from transformers import AutoModel
 import timm
 import hydra
 from omegaconf import DictConfig
+from tab_transformer_pytorch import FTTransformer
 
 class TextTower(nn.Module):
     def __init__(self, cfg: DictConfig):
@@ -97,18 +98,25 @@ class ImageTower(nn.Module):
 class TabularTower(nn.Module):
     def __init__(self, cfg: DictConfig):
         super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(cfg.model.tabular.input_dim, cfg.model.tabular.hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(cfg.model.tabular.dropout),
-            nn.Linear(cfg.model.tabular.hidden_dim, cfg.model.tabular.projection_dim),
-            nn.LayerNorm(cfg.model.tabular.projection_dim)
+        tab_cfg = cfg.model.tabular
+        # Expect categories (list of int cardinalities) and num_continuous
+        self.model = FTTransformer(
+            categories=tuple(tab_cfg.categories),
+            num_continuous=int(tab_cfg.num_continuous),
+            dim=int(tab_cfg.dim),
+            dim_out=int(tab_cfg.projection_dim),
+            depth=int(tab_cfg.depth),
+            heads=int(tab_cfg.heads),
+            attn_dropout=float(tab_cfg.attn_dropout),
+            ff_dropout=float(tab_cfg.ff_dropout)
         )
-    
-    def forward(self, tabular_inputs: torch.Tensor) -> torch.Tensor:
-        return self.encoder(tabular_inputs)
 
-@hydra.main(config_path="../../configs", config_name="config")
+    def forward(self, tabular_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+        # model expects (x_categ, x_cont)
+        x_categ = tabular_inputs['categorical']  # [B, num_cats] long
+        x_cont = tabular_inputs['continuous']    # [B, num_cont]
+        return self.model(x_categ, x_cont)
+
 class FraudDetectionModel(nn.Module):
     def __init__(self, cfg: DictConfig, training=True):
         super().__init__()
@@ -126,11 +134,11 @@ class FraudDetectionModel(nn.Module):
             fusion_emb_size += cfg.model.tabular.projection_dim
         
         # Load fusion module using Hydra
-        self.fusion = hydra.utils.instantiate(cfg.model.fusion, input_dim=fusion_emb_size)
+        self.fusion = hydra.utils.instantiate(cfg.fusion, input_dim=fusion_emb_size)
 
         # Classifier
         self.classifier = nn.Sequential(
-            nn.Linear(cfg.model.fusion.output_dim, cfg.model.classifier.hidden_dim),
+            nn.Linear(cfg.fusion.output_dim, cfg.model.classifier.hidden_dim),
             nn.ReLU(),
             nn.Dropout(cfg.model.classifier.dropout),
             nn.Linear(cfg.model.classifier.hidden_dim, 1)
@@ -183,14 +191,17 @@ class FraudDetectionModel(nn.Module):
         
         # Collect embeddings from enabled modalities only
         if hasattr(self, 'text_tower'):
-            embeds.append(self.text_tower(batch['text']))
-            batch_size = batch['text'].shape[0]
+            text_emb = self.text_tower(batch['text'])
+            embeds.append(text_emb)
+            batch_size = text_emb.shape[0]
         if hasattr(self, 'image_tower'):
-            embeds.append(self.image_tower(batch['images']))
-            batch_size = batch['images'].shape[0]
+            img_emb = self.image_tower(batch['images'])
+            embeds.append(img_emb)
+            batch_size = img_emb.shape[0]
         if hasattr(self, 'tabular_tower'):
-            embeds.append(self.tabular_tower(batch['tabular']))
-            batch_size = batch['tabular'].shape[0]
+            tab_emb = self.tabular_tower(batch['tabular'])
+            embeds.append(tab_emb)
+            batch_size = tab_emb.shape[0]
 
         # Apply modality dropout during training only - randomly mask enabled modalities
         embeds = self._apply_modality_dropout(embeds, batch_size)
@@ -203,7 +214,3 @@ class FraudDetectionModel(nn.Module):
             'embeds': embeds,
             'fused_features': fused_features
         }
-
-@hydra.main(config_path="../../configs", config_name="config")
-def create_model(cfg: DictConfig) -> FraudDetectionModel:
-    return FraudDetectionModel(cfg)

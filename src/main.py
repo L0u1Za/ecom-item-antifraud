@@ -11,7 +11,7 @@ from training.trainer import Trainer
 
 log = logging.getLogger(__name__)
 
-@hydra.main(version_base=None, config_path="../configs", config_name="config")
+@hydra.main(version_base=None, config_path="./config", config_name="config")
 def main(cfg: DictConfig) -> None:
     # Print config
     log.info(f"\n{OmegaConf.to_yaml(cfg)}")
@@ -28,10 +28,28 @@ def main(cfg: DictConfig) -> None:
     # Initialize processors
     processors = {
         'text': TextProcessor(**cfg.preprocessing.text),
-        'image': ImageProcessor(**cfg.preprocessing.image),
-        'tabular': TabularProcessor(**cfg.preprocessing.tabular),
-        'image_test': ImageProcessor(**cfg.preprocessing.image, training=False),
+        'image': ImageProcessor(cfg),
+        'tabular': TabularProcessor(
+            categorical_cols=list(cfg.preprocessing.tabular.categorical_cols),
+            numerical_cols=list(cfg.preprocessing.tabular.numerical_cols),
+            scaling=cfg.preprocessing.tabular.get('scaling', 'standard')
+        ),
+        'image_test': ImageProcessor(cfg, training=False),
     }
+
+    # Fit TabularProcessor on train data and update model.tabular config for FTTransformer
+    from pathlib import Path
+    import pandas as pd
+    train_df = pd.read_csv(cfg.experiment.data.train_path)
+    processors['tabular'].fit(train_df)
+    # Inject learned cardinalities and continuous count into cfg for model init
+    cfg.model.model.tabular.categories = processors['tabular'].categories_cardinalities
+    extra_continuous = 0
+    if cfg.preprocessing.text.get('add_fraud_indicators', False):
+        extra_continuous += int(cfg.model.get('fraud_indicator_dim', 20))
+    if cfg.preprocessing.image.get('compute_clip_similarity', False):
+        extra_continuous += 1
+    cfg.model.model.tabular.num_continuous = processors['tabular'].num_continuous + extra_continuous
 
     # Create dataloaders using factory
     dataloaders = DataLoaderFactory.create_dataloaders(
@@ -43,10 +61,17 @@ def main(cfg: DictConfig) -> None:
     )
 
     # Initialize model
-    model = FraudDetectionModel(cfg).to(device)
+    model = FraudDetectionModel(cfg.model).to(device)
 
     # Setup criterion
-    criterion = hydra.utils.instantiate(cfg.training.criterion)
+    criterion_cfg = cfg.training.criterion
+    if '_target_' in criterion_cfg and criterion_cfg._target_ == "torch.nn.BCEWithLogitsLoss":
+        pos_weight = None
+        if 'pos_weight' in criterion_cfg and criterion_cfg.pos_weight is not None:
+            pos_weight = torch.tensor(float(criterion_cfg.pos_weight), device=device)
+            criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight).to(device)
+        else:
+            criterion = hydra.utils.instantiate(criterion_cfg)
 
     # Setup optimizer
     optimizer = hydra.utils.instantiate(

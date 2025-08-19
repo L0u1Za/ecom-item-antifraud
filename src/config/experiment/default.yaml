@@ -1,21 +1,20 @@
-experiment:
-  name: "baseline"
-  tags: ["fraud-detection", "multimodal"]
+name: "baseline"
+tags: ["fraud-detection", "multimodal"]
+
+wandb:
+  enabled: true
+  project: "fraud-detection"
+  entity: "luizanigogosova"
   
-  wandb:
-    enabled: true
-    project: "fraud-detection"
-    entity: "luizanigogosova"
-    
-  data:
-    train_path: "data/train"
-    val_path: "data/val"
-    test_path: "..."
-    num_workers: 4
-    
-  checkpointing:
-    dir: "checkpoints"
-    save_best: true
-    save_last: true
-    save_frequency: 5  # Save every N epochs
-    save_frequency_enabled: true  # Enable periodic saving
+data:
+  train_path: "data/train.csv"
+  val_path: "data/val.csv"
+  test_path: "dafa/test_prepared.csv"
+  num_workers: 4
+  
+checkpointing:
+  dir: "checkpoints"
+  save_best: true
+  save_last: true
+  save_frequency: 5  # Save every N epochs
+  save_frequency_enabled: true  # Enable periodic saving

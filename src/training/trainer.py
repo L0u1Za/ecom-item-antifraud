@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import _LRScheduler
 
-from wandb_logger import WandBLogger
+from training.wandb_logger import WandBLogger
 from training.validation import Validator
 from utils.logger import setup_logger
 from pathlib import Path
@@ -30,11 +30,13 @@ class Trainer:
         self.logger = setup_logger('fraud_detection', 'fraud_detection.log')
         
         # Initialize validator
+        self.config = config
         self.validator = Validator(
             model=model,
             dataloader=val_loader,
             device=device,
-            threshold=config.training.validation.threshold  # Initial threshold, can be optimized during training
+            criterion=criterion,
+            threshold=config.training.validation.threshold
         )
         
         if config.experiment.wandb.enabled == True:
@@ -107,11 +109,19 @@ class Trainer:
             total_loss = 0
             for batch_idx, batch in enumerate(self.train_loader):
                 inputs, labels = batch
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                # Move batch dict recursively to device
+                def move_to_device(x):
+                    if isinstance(x, dict):
+                        return {k: move_to_device(v) for k, v in x.items()}
+                    if hasattr(x, 'to'):
+                        return x.to(self.device)
+                    return x
+                inputs = move_to_device(inputs)
+                labels = labels.to(self.device)
 
                 self.optimizer.zero_grad()
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
+                outputs, _ = self.model(inputs)
+                loss = self.criterion(outputs.squeeze(-1), labels)
                 loss.backward()
                 self.optimizer.step()
 

@@ -1,9 +1,7 @@
-text:
-# rules
-  max_length: 512
-  apply_cleaning: true
-  apply_lemmatization: true
-  add_fraud_indicators: false
+# @package preprocessing.text
 
-# collator
-  vectorize: false
+# rules
+max_length: 512
+apply_cleaning: true
+apply_lemmatization: true
+add_fraud_indicators: false

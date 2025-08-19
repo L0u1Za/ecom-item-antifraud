@@ -1,13 +1,13 @@
 model:
   text:
     enabled: true
-    name: "bert-base-uncased"
+    name: "cointegrated/rubert-tiny"
     pretrained: true
     projection_dim: 256
     dropout: 0.3
     
   image:
-    enabled: true
+    enabled: false
     name: "resnet50"
     pretrained: true
     pool_type: learned
@@ -16,10 +16,15 @@ model:
     
   tabular:
     enabled: true
-    input_dim: 128
-    hidden_dim: 256
-    projection_dim: 256
-    dropout: 0.3
+    # FTTransformer hyperparameters
+    categories: []         # to be filled at runtime from TabularProcessor.fit()
+    num_continuous: 0      # to be filled at runtime from TabularProcessor.fit()
+    dim: 32
+    projection_dim: 256    # FTTransformer dim_out
+    depth: 6
+    heads: 8
+    attn_dropout: 0.1
+    ff_dropout: 0.1
     
   classifier:
     hidden_dim: 512
@@ -27,3 +32,15 @@ model:
     
   # Modality dropout for training robustness
   modality_dropout: 0.0  # Dropout rate for train (0.0 = no dropout)
+  cache_dir: "cache"
+
+fusion:
+  _target_: "models.fusion.fusion.Fusion"
+  type: "early"  # [early, late, gated]
+    
+  output_dim: 768
+  dropout: 0.3
+  
+#  gating:
+#    enabled: false
+#    hidden_dim: 128

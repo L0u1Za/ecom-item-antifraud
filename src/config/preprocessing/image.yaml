@@ -1,31 +1,32 @@
-image:
-  size: [224, 224]
-  
-  augmentations:
-    # Order matters! Start with geometric transforms, then color/intensity
-    - transform:
-        _target_: torchvision.transforms.RandomResizedCrop
-        size: 224
-        scale: [0.8, 1.0]  # Less aggressive cropping for fraud detection
-      probability: 0.5
-      
-    - transform:
-        _target_: torchvision.transforms.RandomHorizontalFlip
-        p: 0.5
-      probability: 0.1
-      
-    - transform:
-        _target_: torchvision.transforms.RandomRotation
-        degrees: 10  # Small rotations to preserve text readability
-      probability: 0.3
-      
-    - transform:
-        _target_: torchvision.transforms.ColorJitter
-        brightness: 0.1
-        contrast: 0.1
-        saturation: 0.1
-        hue: 0.05  # Smaller hue changes to preserve brand colors
-      probability: 0.3
+# @package preprocessing.image
+
+size: [224, 224]
+
+augmentations:
+  # Order matters! Start with geometric transforms, then color/intensity
+  - transform:
+      _target_: torchvision.transforms.RandomResizedCrop
+      size: 224
+      scale: [0.8, 1.0]  # Less aggressive cropping for fraud detection
+    probability: 0.5
     
-  compute_clip_similarity: true
-  clip_model: "openai/clip-vit-base-patch32"
+  - transform:
+      _target_: torchvision.transforms.RandomHorizontalFlip
+      p: 0.5
+    probability: 0.1
+    
+  - transform:
+      _target_: torchvision.transforms.RandomRotation
+      degrees: 10  # Small rotations to preserve text readability
+    probability: 0.3
+    
+  - transform:
+      _target_: torchvision.transforms.ColorJitter
+      brightness: 0.1
+      contrast: 0.1
+      saturation: 0.1
+      hue: 0.05  # Smaller hue changes to preserve brand colors
+    probability: 0.3
+  
+compute_clip_similarity: true
+clip_model: "openai/clip-vit-base-patch32"

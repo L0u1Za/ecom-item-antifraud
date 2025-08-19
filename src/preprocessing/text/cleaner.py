@@ -5,7 +5,6 @@ from bs4 import BeautifulSoup
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
 
 class TextCleaner:
     def __init__(self):
@@ -14,7 +13,6 @@ class TextCleaner:
         nltk.download('stopwords')
         nltk.download('wordnet')
         
-        self.lemmatizer = WordNetLemmatizer()
         self.stop_words = set(stopwords.words('russian') + stopwords.words('english'))
         
     def clean_html(self, text: str) -> str:
@@ -59,8 +57,7 @@ class TextCleaner:
     
     def clean_text(self, 
                   text: str, 
-                  remove_stopwords: bool = False,
-                  lemmatize: bool = True) -> dict:
+                  remove_stopwords: bool = False) -> dict:
         """
         Clean text with all necessary preprocessing steps
         
@@ -68,7 +65,6 @@ class TextCleaner:
             text: Input text
             remove_stopwords: Whether to remove stop words
             lemmatize: Whether to apply lemmatization
-            extract_contacts: Whether to extract contact information
             
         Returns:
             Dictionary containing cleaned text and extracted information
@@ -80,18 +76,14 @@ class TextCleaner:
         text = text.lower()
         
         # Normalize Unicode characters
-        text = self.normalize_unicode(text)
+        # text = self.normalize_unicode(text)
         
         # Tokenize
-        tokens = word_tokenize(text)
+        tokens = word_tokenize(text, language='russian')
         
         # Remove stop words if requested
         if remove_stopwords:
             tokens = [token for token in tokens if token not in self.stop_words]
-        
-        # Lemmatize if requested
-        if lemmatize:
-            tokens = [self.lemmatizer.lemmatize(token) for token in tokens]
         
         # Join tokens back into text
         cleaned_text = ' '.join(tokens)
