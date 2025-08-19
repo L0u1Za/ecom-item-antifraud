@@ -10,9 +10,7 @@ Pillow
 tqdm
 optuna
 timm
-#tab-transformer-pytorch
-hyper_connections
-einops
+tab-transformer-pytorch
 
 hydra-core
 bs4

@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 import json
 
 class BusinessRulesChecker:
-    def __init__(self, config_path: str = "config/business_rules.json"):
+    def __init__(self, config_path: str = None):
         # Load configuration
         self.config = self._load_config(config_path)
 

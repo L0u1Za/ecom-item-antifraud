@@ -65,11 +65,11 @@ class TextCleaner:
         Args:
             text: Input text
             remove_stopwords: Whether to remove stop words
-            lemmatize: Whether to apply lemmatization
             
         Returns:
             Dictionary containing cleaned text and extracted information
         """
+        print(text)
         # Clean HTML and normalize spaces
         text = self.clean_html(text)
         
