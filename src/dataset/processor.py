@@ -30,7 +30,7 @@ class TextProcessor:
             import nltk
             os.makedirs(nltk_data_dir, exist_ok=True)
             if nltk_data_dir not in nltk.data.path:
-                nltk.data.path.insert(0, nltk_data_dir)
+                nltk.data.path.append(nltk_data_dir)
 
         self.cleaner = TextCleaner(nltk_data_dir)
 
