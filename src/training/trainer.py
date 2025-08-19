@@ -30,7 +30,8 @@ class Trainer:
         self.device = device
         self.scheduler = scheduler
         self.logger = setup_logger('fraud_detection', 'fraud_detection.log')
-        
+        self.config = config
+
         # Initialize validator
         self.validator = Validator(
             model=model,
