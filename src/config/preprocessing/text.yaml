@@ -3,7 +3,7 @@
 # rules
 max_length: 512
 apply_cleaning: true
-apply_lemmatization: true
+apply_lemmatization: false
 add_fraud_indicators: false
 
 # NLTK setup
