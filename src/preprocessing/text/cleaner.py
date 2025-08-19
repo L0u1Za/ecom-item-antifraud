@@ -69,7 +69,6 @@ class TextCleaner:
         Returns:
             Dictionary containing cleaned text and extracted information
         """
-        print(text)
         # Clean HTML and normalize spaces
         text = self.clean_html(text)
         

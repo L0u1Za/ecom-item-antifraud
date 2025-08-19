@@ -8,6 +8,10 @@ from dataset.dataloader import DataLoaderFactory
 from models.architecture import FraudDetectionModel
 from training.trainer import Trainer
 
+import warnings
+from bs4 import MarkupResemblesLocatorWarning
+
+warnings.filterwarnings('ignore', category=MarkupResemblesLocatorWarning)
 
 log = logging.getLogger(__name__)
 
