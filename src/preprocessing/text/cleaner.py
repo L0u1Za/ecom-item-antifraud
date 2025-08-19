@@ -12,6 +12,7 @@ class TextCleaner:
         nltk.download('punkt', nltk_data_dir)
         nltk.download('stopwords', nltk_data_dir)
         nltk.download('wordnet', nltk_data_dir)
+        nltk.download('omw-1.4', nltk_data_dir)
         
         self.stop_words = set(stopwords.words('russian') + stopwords.words('english'))
         
