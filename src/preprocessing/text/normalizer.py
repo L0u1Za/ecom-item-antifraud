@@ -1,10 +1,7 @@
 import re
 import nltk
-from nltk.stem import WordNetLemmatizer
 
-# Ensure that the necessary NLTK resources are downloaded
-nltk.download('punkt')
-nltk.download('wordnet')
+from nltk.stem import WordNetLemmatizer
 
 lemmatizer = WordNetLemmatizer()
 

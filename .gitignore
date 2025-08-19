@@ -211,3 +211,4 @@ wandb/
 data/
 cache/
 outputs/
+nltk_data/

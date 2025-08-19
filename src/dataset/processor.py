@@ -18,12 +18,21 @@ class TextProcessor:
                  max_length=512,
                  apply_cleaning=True,
                  apply_lemmatization=True,
-                 add_fraud_indicators=True):
+                 add_fraud_indicators=True,
+                 nltk_data_dir: str = None):
         self.max_length = max_length
         self.apply_cleaning = apply_cleaning
         self.apply_lemmatization = apply_lemmatization
         self.add_fraud_indicators = add_fraud_indicators
-        self.cleaner = TextCleaner()
+        # Configure NLTK data directory if provided
+        if nltk_data_dir:
+            import os
+            import nltk
+            os.makedirs(nltk_data_dir, exist_ok=True)
+            if nltk_data_dir not in nltk.data.path:
+                nltk.data.path.insert(0, nltk_data_dir)
+
+        self.cleaner = TextCleaner(nltk_data_dir)
 
     def preprocess_text(self, text: str) -> str:
         if self.apply_cleaning:

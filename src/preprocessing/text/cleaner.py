@@ -7,11 +7,11 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 
 class TextCleaner:
-    def __init__(self):
+    def __init__(self, nltk_data_dir):
         # Download required NLTK data
-        nltk.download('punkt')
-        nltk.download('stopwords')
-        nltk.download('wordnet')
+        nltk.download('punkt', nltk_data_dir)
+        nltk.download('stopwords', nltk_data_dir)
+        nltk.download('wordnet', nltk_data_dir)
         
         self.stop_words = set(stopwords.words('russian') + stopwords.words('english'))
         
