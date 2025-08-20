@@ -4,60 +4,44 @@ from typing import Dict, Any, List
 import hydra
 from omegaconf import DictConfig
 import math
-import numpy as np
 import pandas as pd
-
-from preprocessing.text.cleaner import TextCleaner
-from preprocessing.text.normalizer import normalize_text
-from preprocessing.text.business_rules import BusinessRulesChecker
 
 from preprocessing.image.clip_validator import CLIPValidator
 
 class TextProcessor:
     def __init__(self,
                  max_length=512,
-                 apply_cleaning=True,
-                 apply_lemmatization=True,
-                 add_fraud_indicators=True,
-                 nltk_data_dir: str = None,
                  **kwargs):
+        """
+        Simplified TextProcessor for inference/training pipeline.
+        Data cleaning and fraud indicators are now handled in the data preparation script.
+        """
         self.max_length = max_length
-        self.apply_cleaning = apply_cleaning
-        self.apply_lemmatization = apply_lemmatization
-        self.add_fraud_indicators = add_fraud_indicators
-        # Configure NLTK data directory if provided
-        if nltk_data_dir:
-            import os
-            import nltk
-            os.makedirs(nltk_data_dir, exist_ok=True)
-            if nltk_data_dir not in nltk.data.path:
-                nltk.data.path.append(nltk_data_dir)
-
-        self.cleaner = TextCleaner(nltk_data_dir)
 
     def preprocess_text(self, text: str) -> str:
-        if self.apply_cleaning:
-            text = self.cleaner.clean_text(text)
-            text = self.cleaner.clean_repeating_chars(text)
-            text = self.cleaner.truncate_text(text, self.max_length)
-
-        if self.apply_lemmatization:
-            text = normalize_text(text)
+        """
+        Basic text preprocessing for inference.
+        Heavy cleaning is done during data preparation.
+        """
+        if isinstance(text, str):
+            # Basic truncation for inference
+            if len(text) > self.max_length:
+                text = text[:self.max_length]
+        else:
+            text = str(text) if text is not None else ""
         
         return text
         
-    def __call__(self, text_data: Dict[str, str]) -> Dict[str, torch.Tensor]:
-        # Process title and description
-        title = text_data['title']
-        description = text_data['description']
-        brand_name = text_data['brand_name']
+    def __call__(self, text_data: Dict[str, str]) -> Dict[str, str]:
+        """
+        Process text data for model input.
+        Assumes data has already been cleaned during preparation.
+        """
+        # Process title and description with basic preprocessing
+        title = text_data.get('title', '')
+        description = text_data.get('description', '')
 
-        # Get suspicious patterns first
-        if self.add_fraud_indicators:
-            checker = BusinessRulesChecker()
-            fraud_indicators = checker(brand_name, description)
-
-        # Process title and description
+        # Apply basic preprocessing
         title = self.preprocess_text(title)
         description = self.preprocess_text(description)
 
@@ -65,8 +49,6 @@ class TextProcessor:
             'title': title,
             'description': description
         }
-        if self.add_fraud_indicators:
-            obj['fraud_indicators'] = fraud_indicators
 
         return obj
 

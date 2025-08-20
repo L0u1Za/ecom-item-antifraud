@@ -21,9 +21,6 @@ class MultiModalCollator:
         )
         self.max_length = config.preprocessing.text.max_length
         
-        # Get fraud indicators config
-        self.use_fraud_indicators = config.preprocessing.text.get('add_fraud_indicators', False)
-        self.fraud_indicator_dim = config.preprocessing.text.get('fraud_indicator_dim', 20)
     def __call__(self, batch: List[Dict]) -> Dict[str, torch.Tensor]:
         """
         Collate function for multimodal batches
@@ -90,23 +87,6 @@ class MultiModalCollator:
             continuous = torch.stack(cont_list)
         else:
             continuous = torch.zeros((len(batch), 0), dtype=torch.float32)
-        
-        # Handle fraud indicators if present
-        if self.use_fraud_indicators:
-            fraud_indicators = []
-            for t in text_samples:
-                if 'fraud_indicators' in t:
-                    indicators = torch.zeros(self.fraud_indicator_dim)
-                    for i, (key, value) in enumerate(t['fraud_indicators'].items()):
-                        if i < self.fraud_indicator_dim:
-                            indicators[i] = float(value)
-                    fraud_indicators.append(indicators)
-                else:
-                    fraud_indicators.append(torch.zeros(self.fraud_indicator_dim))
-
-            fraud_tensor = torch.stack(fraud_indicators)
-            # Append additional boolean indicators to continuous features
-            continuous = torch.cat([continuous, fraud_tensor], dim=1) if continuous.numel() > 0 else fraud_tensor
         
         if getattr(self.config.preprocessing.image, 'compute_clip_similarity', False):
             clip_similarities = [item.get('text_image_similarity', torch.tensor(0.0)) for item in image_samples]

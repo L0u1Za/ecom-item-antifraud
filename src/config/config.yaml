@@ -11,3 +11,9 @@ project:
   name: fraud-detection
   seed: 42
   output_dir: ${hydra:runtime.output_dir}
+
+# Data preparation settings
+data_preparation:
+  train_path: data/ml_ozon_train.csv
+  test_path: data/ml_ozon_test.csv
+  output_dir: data

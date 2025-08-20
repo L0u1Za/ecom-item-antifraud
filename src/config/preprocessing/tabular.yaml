@@ -41,17 +41,26 @@ numerical_cols:
   - ExemplarReturnedValueTotal90
   - ItemVarietyCount
   - ItemAvailableCount
-  - seller_time_alive
-#  - return_rate_30
-#  - fake_return_rate_30
-#  - refund_value_ratio_30
-#  - sales_growth_7_30
-#  - sales_growth_30_90
-#  - sales_velocity
-#  - seller_velocity
-#  - desc_len
-#  - desc_word_count
-#  - name_len
-#  - price_return_interaction
-#  - gmv_per_day
+  - seller_time_alive # Afther this there are generated vars
+  - return_rate_30
+  - fake_return_rate_30
+  - refund_value_ratio_30
+  - sales_growth_7_30
+  - sales_growth_30_90
+  - sales_velocity
+  - seller_velocity
+  - desc_len
+  - desc_word_count
+  - name_len
+  - price_return_interaction
+  - gmv_per_day
+  - fraud_description_brand_names
+  - fraud_description_messenger
+  - fraud_description_mixed_alphabets
+  - fraud_description_phone
+  - fraud_description_suspicious_numbers
+  - fraud_short_description
+  - fraud_title_brand_names
+  - fraud_title_description_mismatch
+  - fraud_title_mixed_alphabets
 scaling: "standard"

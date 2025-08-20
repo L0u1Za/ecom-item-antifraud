@@ -1,11 +1,10 @@
 # @package preprocessing.text
 
-# rules
-max_length: 1024
+# rules for script preprocessing
 apply_cleaning: true
-apply_lemmatization: false
+apply_lemmatization: true
 add_fraud_indicators: true
-fraud_indicator_dim: 20
+max_length: 1024
 
 # NLTK setup
 # Default NLTK data directory can be overridden with env var NLTK_DATA or CLI
