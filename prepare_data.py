@@ -16,9 +16,9 @@ import sys
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from preprocessing.text.cleaner import TextCleaner
-from preprocessing.text.normalizer import normalize_text
-from preprocessing.text.business_rules import BusinessRulesChecker
+from src.preprocessing.text.cleaner import TextCleaner
+from src.preprocessing.text.normalizer import normalize_text
+from src.preprocessing.text.business_rules import BusinessRulesChecker
 
 
 def clean_and_process_text(df, config, text_columns=['description', 'name_rus']):
