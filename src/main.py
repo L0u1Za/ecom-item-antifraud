@@ -50,7 +50,7 @@ def main(cfg: DictConfig) -> None:
     cfg.model.model.tabular.categories = processors['tabular'].categories_cardinalities
     extra_continuous = 0
     if cfg.preprocessing.text.get('add_fraud_indicators', False):
-        extra_continuous += int(cfg.model.get('fraud_indicator_dim', 20))
+        extra_continuous += int(cfg.preprocessing.text.get('fraud_indicator_dim', 20))
     if cfg.preprocessing.image.get('compute_clip_similarity', False):
         extra_continuous += 1
     cfg.model.model.tabular.num_continuous = processors['tabular'].num_continuous + extra_continuous

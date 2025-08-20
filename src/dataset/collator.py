@@ -23,7 +23,7 @@ class MultiModalCollator:
         
         # Get fraud indicators config
         self.use_fraud_indicators = config.preprocessing.text.get('add_fraud_indicators', False)
-        self.fraud_indicator_dim = config.model.get('fraud_indicator_dim', 20)
+        self.fraud_indicator_dim = config.preprocessing.text.get('fraud_indicator_dim', 20)
     def __call__(self, batch: List[Dict]) -> Dict[str, torch.Tensor]:
         """
         Collate function for multimodal batches

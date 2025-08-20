@@ -19,7 +19,8 @@ class TextProcessor:
                  apply_cleaning=True,
                  apply_lemmatization=True,
                  add_fraud_indicators=True,
-                 nltk_data_dir: str = None):
+                 nltk_data_dir: str = None,
+                 **kwargs):
         self.max_length = max_length
         self.apply_cleaning = apply_cleaning
         self.apply_lemmatization = apply_lemmatization
