@@ -49,9 +49,6 @@ class BusinessRulesChecker:
         if len(description) < self.config['min_description_length']:
             issues['short_description'] = True
             
-        if len(title) > self.config['max_title_length']:
-            issues['long_title'] = True
-            
         # Content consistency
         if not title.lower() in description.lower():
             issues['title_description_mismatch'] = True
@@ -62,15 +59,10 @@ class BusinessRulesChecker:
             issues['suspicious_keywords'] = True
             
         # Check patterns in both
-        title_patterns = self.check_text_patterns(title)
         desc_patterns = self.check_text_patterns(description)
         
-        # Combine results
         issues.update({
-            f"title_{k}": v for k, v in title_patterns.items() if v
-        })
-        issues.update({
-            f"description_{k}": v for k, v in desc_patterns.items() if v
+            f"{k}": v for k, v in desc_patterns.items() if v
         })
         
         return issues

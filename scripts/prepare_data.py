@@ -32,6 +32,39 @@ def clean_and_process_text(df, config, text_columns=['description', 'name_rus'])
     """
     text_config = config.preprocessing.text
     
+    # Add fraud indicators based on brand_name and description
+    if text_config.add_fraud_indicators:
+        print("Adding fraud indicators...")
+        if 'brand_name' in df.columns and 'description' in df.columns:
+            checker = BusinessRulesChecker()
+            
+            # Collect all fraud indicators for all rows
+            all_indicators = []
+            for idx, row in df.iterrows():
+                brand_name = str(row['brand_name']) if pd.notna(row['brand_name']) else ""
+                description = str(row['description']) if pd.notna(row['description']) else ""
+                title = str(row['name_rus']) if pd.notna(row['description']) else ""
+                indicators_desc = checker(brand_name, description)
+                indicators_title = checker(brand_name, title)
+                indicators_desc = {f"desc_{indicator[0]}": indicator[1] for indicator in indicators_desc.items()}
+                indicators_title = {f"title_{indicator[0]}": indicator[1] for indicator in indicators_title.items()}
+                all_indicators.append(indicators_desc)
+                all_indicators[-1].update(indicators_title)
+            
+            # Get all possible fraud indicator keys
+            all_keys = set()
+            for indicators in all_indicators:
+                all_keys.update(indicators.keys())
+            
+            # Create separate columns for each fraud indicator
+            print(f"Creating {len(all_keys)} fraud indicator columns...")
+            for key in sorted(all_keys):
+                column_name = f"fraud_{key}"
+                df[column_name] = [indicators.get(key, False) for indicators in all_indicators]
+                print(f"  - {column_name}")
+    else:
+        print("Skipping fraud indicators (disabled in config)")
+    
     if text_config.apply_cleaning:
         print("Cleaning and processing text data...")
         
@@ -52,34 +85,6 @@ def clean_and_process_text(df, config, text_columns=['description', 'name_rus'])
                     df[col] = df[col].apply(lambda x: normalize_text(x))
     else:
         print("Skipping text cleaning (disabled in config)")
-    
-    # Add fraud indicators based on brand_name and description
-    if text_config.add_fraud_indicators:
-        print("Adding fraud indicators...")
-        if 'brand_name' in df.columns and 'description' in df.columns:
-            checker = BusinessRulesChecker()
-            
-            # Collect all fraud indicators for all rows
-            all_indicators = []
-            for idx, row in df.iterrows():
-                brand_name = str(row['brand_name']) if pd.notna(row['brand_name']) else ""
-                description = str(row['description']) if pd.notna(row['description']) else ""
-                indicators = checker(brand_name, description)
-                all_indicators.append(indicators)
-            
-            # Get all possible fraud indicator keys
-            all_keys = set()
-            for indicators in all_indicators:
-                all_keys.update(indicators.keys())
-            
-            # Create separate columns for each fraud indicator
-            print(f"Creating {len(all_keys)} fraud indicator columns...")
-            for key in sorted(all_keys):
-                column_name = f"fraud_{key}"
-                df[column_name] = [indicators.get(key, False) for indicators in all_indicators]
-                print(f"  - {column_name}")
-    else:
-        print("Skipping fraud indicators (disabled in config)")
     
     return df
 
