@@ -2,6 +2,8 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import logging
 import torch
+import pickle
+import os
 
 from dataset.processor import TextProcessor, ImageProcessor, TabularProcessor
 from dataset.dataloader import DataLoaderFactory
@@ -47,11 +49,16 @@ def main(cfg: DictConfig) -> None:
     train_df = pd.read_csv(cfg.experiment.data.train_path)
     processors['tabular'].fit(train_df)
     # Inject learned cardinalities and continuous count into cfg for model init
-    cfg.model.model.tabular.categories = processors['tabular'].categories_cardinalities
-    extra_continuous = 0
-    if cfg.preprocessing.image.get('compute_clip_similarity', False):
-        extra_continuous += 1
-    cfg.model.model.tabular.num_continuous = processors['tabular'].num_continuous + extra_continuous
+    cfg.model.model.tabular.categories = processors['tabular'].category_cardinalities
+    extra_continuous = 1 if cfg.preprocessing.image.get('compute_clip_similarity', False) else 0
+    cfg.model.model.tabular.num_continuous = processors['tabular'].num_continuous_features + extra_continuous
+
+    # Save the fitted tabular processor
+    processor_path = cfg.processors.tabular_processor_path
+    os.makedirs(os.path.dirname(processor_path), exist_ok=True)
+    with open(processor_path, "wb") as f:
+        pickle.dump(processors['tabular'], f)
+    log.info(f"Saved fitted TabularProcessor to {processor_path}")
 
     # Create dataloaders using factory
     dataloaders = DataLoaderFactory.create_dataloaders(

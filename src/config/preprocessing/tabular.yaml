@@ -41,38 +41,38 @@ numerical_cols:
   - ExemplarReturnedValueTotal90
   - ItemVarietyCount
   - ItemAvailableCount
-  - seller_time_alive # Afther this there are generated vars
-  - return_rate_30
-  - fake_return_rate_30
-  - refund_value_ratio_30
-  - sales_growth_7_30
-  - sales_growth_30_90
-  - sales_velocity
-  - seller_velocity
-  - desc_len
-  - desc_word_count
-  - name_len
-  - price_return_interaction
-  - gmv_per_day
-  - fraud_desc_brand_names
-  - fraud_desc_messenger
-  - fraud_desc_mixed_alphabets
-  - fraud_desc_phone
-  - fraud_desc_repeated_chars
-  - fraud_desc_short_description
-  - fraud_desc_suspicious_keywords
-  - fraud_desc_suspicious_numbers
-  - fraud_desc_title_description_mismatch
-  - fraud_desc_unusual_punct
-  - fraud_desc_url
-  - fraud_title_brand_names
-  - fraud_title_messenger
-  - fraud_title_mixed_alphabets
-  - fraud_title_phone
-  - fraud_title_repeated_chars
-  - fraud_title_short_description
-  - fraud_title_suspicious_keywords
-  - fraud_title_suspicious_numbers
-  - fraud_title_title_description_mismatch
-  - fraud_title_unusual_punct
+#  - seller_time_alive # Afther this there are generated vars
+#  - return_rate_30
+#  - fake_return_rate_30
+#  - refund_value_ratio_30
+#  - sales_growth_7_30
+#  - sales_growth_30_90
+#  - sales_velocity
+#  - seller_velocity
+#  - desc_len
+#  - desc_word_count
+#  - name_len
+#  - price_return_interaction
+#  - gmv_per_day
+#  - fraud_desc_brand_names
+#  - fraud_desc_messenger
+#  - fraud_desc_mixed_alphabets
+#  - fraud_desc_phone
+#  - fraud_desc_repeated_chars
+#  - fraud_desc_short_description
+#  - fraud_desc_suspicious_keywords
+#  - fraud_desc_suspicious_numbers
+#  - fraud_desc_title_description_mismatch
+#  - fraud_desc_unusual_punct
+#  - fraud_desc_url
+#  - fraud_title_brand_names
+#  - fraud_title_messenger
+#  - fraud_title_mixed_alphabets
+#  - fraud_title_phone
+#  - fraud_title_repeated_chars
+#  - fraud_title_short_description
+#  - fraud_title_suspicious_keywords
+#  - fraud_title_suspicious_numbers
+#  - fraud_title_title_description_mismatch
+#  - fraud_title_unusual_punct
 scaling: "standard"

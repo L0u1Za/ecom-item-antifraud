@@ -102,3 +102,36 @@ python prepare_data.py
 ```
 
 The script will provide progress updates and confirm successful completion.
+
+# Inference Script
+
+This directory also contains an inference script `run_inference.py` to generate predictions on a test dataset using a trained model.
+
+## Usage
+
+### Basic Usage
+
+To run inference, you need to provide the path to the test data and the trained model checkpoint. You can do this via command-line overrides.
+
+```bash
+python run_inference.py test_path=/path/to/your/test_prepared.csv +model_path="/path/to/your/model.pth"
+```
+
+### Example
+
+Using the sample test data from `examples/sample_test.csv`:
+
+```bash
+# First, prepare the sample data
+python prepare_data.py data_preparation.test_path=../examples/sample_test.csv
+
+# Then, run inference on the prepared sample data
+python run_inference.py test_path=../data/test_prepared.csv +model_path="/path/to/your/model.pth"
+```
+
+### Output
+
+The script will generate a `submission.csv` file in the root directory with two columns:
+- `id`: The item ID.
+- `prediction`: The predicted fraud probability (a value between 0 and 1).
+

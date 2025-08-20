@@ -1,23 +1,31 @@
 import torch
-from src.models.classifier import Classifier
-from src.inference.cache_manager import CacheManager
+from omegaconf import DictConfig
+
+from models.architecture import FraudDetectionModel
+
 
 class Predictor:
-    def __init__(self, model_path, device='cpu'):
+    def __init__(self, cfg: DictConfig, model_path: str, device: str = "cpu"):
         self.device = device
-        self.model = Classifier()
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        self.model = FraudDetectionModel(cfg, training=False)  # Set training=False
+        checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.to(self.device)
         self.model.eval()
-        self.cache_manager = CacheManager()
 
-    def predict(self, features):
+    def predict(self, batch):
         with torch.no_grad():
-            features = self.cache_manager.get_cached_features(features)
-            inputs = self.prepare_inputs(features)
-            outputs = self.model(inputs)
-            predictions = torch.sigmoid(outputs)
+            batch = self._move_to_device(batch)
+            logits, _ = self.model(batch)
+            predictions = torch.sigmoid(logits)
             return predictions
 
-    def prepare_inputs(self, features):
-        # Implement any necessary preprocessing for the inputs
-        return features
+    def _move_to_device(self, batch):
+        for key in batch:
+            if isinstance(batch[key], torch.Tensor):
+                batch[key] = batch[key].to(self.device)
+            elif isinstance(batch[key], dict):
+                for sub_key in batch[key]:
+                    if isinstance(batch[key][sub_key], torch.Tensor):
+                        batch[key][sub_key] = batch[key][sub_key].to(self.device)
+        return batch

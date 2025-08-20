@@ -149,6 +149,8 @@ class TabularProcessor:
         self.category_value_to_index: Dict[str, Dict[Any, int]] = {}
         self.category_cardinalities: List[int] = []
         self.num_stats: Dict[str, Dict[str, float]] = {}
+        self.num_categorical_features: int = 0
+        self.num_continuous_features: int = 0
 
     def fit(self, df: pd.DataFrame) -> None:
         """
@@ -198,6 +200,10 @@ class TabularProcessor:
             else:
                 # No scaling
                 self.num_stats[col] = {}
+
+        # Store feature counts
+        self.num_categorical_features = len(self.categorical_cols)
+        self.num_continuous_features = len(self.numerical_cols)
 
     @property
     def categories_cardinalities(self) -> List[int]:
