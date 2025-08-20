@@ -57,7 +57,7 @@ def main(cfg: DictConfig) -> None:
     # Note: You need to provide a path to your trained model checkpoint.
     # This can be done via config override: +inference.model_path="path/to/your/model.pth"
     print("Initializing predictor...")
-    predictor = Predictor(cfg=cfg.model, model_path=to_absolute_path(cfg.inference.model_path), device=device)
+    predictor = Predictor(cfg=cfg.model, model_path=to_absolute_path(cfg.inference.model_path), threshold=cfg.inference.threshold, device=device)
 
     # 4. Get predictions
     print("Generating predictions...")
@@ -66,7 +66,7 @@ def main(cfg: DictConfig) -> None:
 
     with torch.no_grad():
         for batch in tqdm(test_dataloader, desc="Generating predictions"):
-            batch_preds = predictor.predict(batch).cpu().numpy().flatten()
+            batch_preds = predictor.predict(batch)
             predictions.extend(batch_preds)
             item_ids.extend(batch["item_id"]) # item_id is now a list/numpy array, not a tensor
 

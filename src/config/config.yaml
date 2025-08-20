@@ -24,3 +24,4 @@ processors:
 inference:
   model_path: "data/baseline_best.pt"
   output_path: "data/submission.csv"
+  threshold: 0.5
