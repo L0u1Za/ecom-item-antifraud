@@ -1,7 +1,7 @@
 # @package preprocessing.text
 
 # rules
-max_length: 512
+max_length: 1024
 apply_cleaning: true
 apply_lemmatization: false
 add_fraud_indicators: false

@@ -16,5 +16,5 @@ checkpointing:
   dir: "checkpoints"
   save_best: true
   save_last: true
-  save_frequency: 5  # Save every N epochs
+  save_frequency: 10  # Save every N epochs
   save_frequency_enabled: true  # Enable periodic saving
