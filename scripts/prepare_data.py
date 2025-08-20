@@ -13,12 +13,8 @@ from sklearn.ensemble import IsolationForest
 import argparse
 import os
 import sys
-from pathlib import Path
 import hydra
 from omegaconf import DictConfig, OmegaConf
-
-# Add src to path for imports
-sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from preprocessing.text.cleaner import TextCleaner
 from preprocessing.text.normalizer import normalize_text
