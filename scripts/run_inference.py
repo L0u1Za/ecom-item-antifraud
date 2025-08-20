@@ -7,10 +7,10 @@ from hydra.utils import to_absolute_path
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset.fraud_dataset import InferenceDataset
-from dataset.collator import MultiModalCollatorTest
-from dataset.processor import TextProcessor, ImageProcessor, TabularProcessor
-from inference.predictor import Predictor
+from src.dataset.fraud_dataset import InferenceDataset
+from src.dataset.collator import MultiModalCollatorTest
+from src.dataset.processor import TextProcessor, ImageProcessor, TabularProcessor
+from src.inference.predictor import Predictor
 
 
 @hydra.main(config_path="../src/config", config_name="config")
