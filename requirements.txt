@@ -2,6 +2,7 @@ numpy
 pandas
 scikit-learn
 torch==2.3.0
+torchmetrics
 # torchvision
 # transformers
 wandb

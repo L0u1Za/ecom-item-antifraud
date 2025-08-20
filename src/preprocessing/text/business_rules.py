@@ -11,7 +11,7 @@ class BusinessRulesChecker:
         self.patterns = {
             'url': re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'),
             'messenger': re.compile(r'(?i)(telegram|whatsapp|viber|signal)[@: ]?\s*(?:@?\w+|\+?\d[\d\s-]+\d)'),
-            'brand_names': re.compile('|'.join(self.config['luxury_brands']), re.IGNORECASE),
+            'brand_names': re.compile('|'.join(self.config.get('luxury_brands', [])), re.IGNORECASE),
             'phone': re.compile(r'(\+7|8)[- _]*\(?[- _]*(\d{3}[- _]*\)?([- _]*\d){7}|\d\d[- _]*\d\d[- _]*\)?([- _]*\d){6})'),
             'mixed_alphabets': re.compile(r'[а-яА-Я][a-zA-Z]|[a-zA-Z][а-яА-Я]'),
             'repeated_chars': re.compile(r'(.)\1{3,}'),
