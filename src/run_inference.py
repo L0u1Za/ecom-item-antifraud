@@ -7,13 +7,13 @@ from hydra.utils import to_absolute_path
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.dataset.fraud_dataset import InferenceDataset
-from src.dataset.collator import MultiModalCollatorTest
-from src.dataset.processor import TextProcessor, ImageProcessor, TabularProcessor
-from src.inference.predictor import Predictor
+from dataset.fraud_dataset import InferenceDataset
+from dataset.collator import MultiModalCollatorTest
+from dataset.processor import TextProcessor, ImageProcessor, TabularProcessor
+from inference.predictor import Predictor
 
 
-@hydra.main(config_path="/src/config", config_name="config")
+@hydra.main(config_path="./config", config_name="config")
 def main(cfg: DictConfig) -> None:
     print("Starting inference...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
