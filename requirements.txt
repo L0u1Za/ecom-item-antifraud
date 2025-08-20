@@ -3,6 +3,7 @@ pandas
 scikit-learn
 torch==2.3.0
 torchmetrics
+matplotlib
 # torchvision
 # transformers
 wandb

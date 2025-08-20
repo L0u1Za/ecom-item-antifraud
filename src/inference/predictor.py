@@ -22,6 +22,12 @@ class Predictor:
             predictions = np.array(torch.sigmoid(logits.squeeze(-1)).cpu())
             predictions = (predictions >= self.threshold).astype(int)
             return predictions
+    def predict_proba(self, batch):
+        with torch.no_grad():
+            batch = self._move_to_device(batch)
+            logits, _ = self.model(batch)
+            predictions = torch.sigmoid(logits.squeeze(-1))
+            return predictions
 
     def _move_to_device(self, batch):
         for key in batch:
