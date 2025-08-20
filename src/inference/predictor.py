@@ -19,7 +19,7 @@ class Predictor:
         with torch.no_grad():
             batch = self._move_to_device(batch)
             logits, _ = self.model(batch)
-            predictions = np.array(torch.sigmoid(logits.squeeze(-1)))
+            predictions = np.array(torch.sigmoid(logits.squeeze(-1)).cpu())
             predictions = (predictions >= self.threshold).astype(int)
             return predictions
 
