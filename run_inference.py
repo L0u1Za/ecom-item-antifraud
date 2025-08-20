@@ -13,7 +13,7 @@ from src.dataset.processor import TextProcessor, ImageProcessor, TabularProcesso
 from src.inference.predictor import Predictor
 
 
-@hydra.main(config_path="../src/config", config_name="config")
+@hydra.main(config_path="/src/config", config_name="config")
 def main(cfg: DictConfig) -> None:
     print("Starting inference...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

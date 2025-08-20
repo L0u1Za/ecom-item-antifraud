@@ -236,7 +236,7 @@ def prepare_data(config, train_path=None, test_path=None, output_dir=None):
     return df_train, df_test
 
 
-@hydra.main(version_base=None, config_path="../src/config", config_name="config")
+@hydra.main(version_base=None, config_path="/src/config", config_name="config")
 def main(config: DictConfig) -> None:
     """
     Main function using Hydra configuration.
