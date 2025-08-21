@@ -97,11 +97,11 @@ class ImageProcessor:
         size = tuple(self.config.preprocessing.image.size)
         if hasattr(self, 'clip_validator'):
             return {
-                'images': [torch.zeros(3, size[0], size[1])],
+                'images': torch.zeros(3, size[0], size[1]),
                 'text_image_similarity': torch.tensor(0.0)
             }
         return {
-            'images': [torch.zeros(3, size[0], size[1])]
+            'images': torch.zeros(3, size[0], size[1])
         }
 
     def __call__(self, image_path: str, title: str = '') -> Dict[str, torch.Tensor]:
@@ -129,10 +129,8 @@ class ImageProcessor:
             # During inference, just use basic transform
             img_tensor = self.transform(image)
         
-        img_tensors = [img_tensor]
-        
         obj = {
-            'images': img_tensors
+            'images': img_tensor
         }
         
         if hasattr(self, 'clip_validator'):

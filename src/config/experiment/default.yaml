@@ -10,8 +10,8 @@ data:
   train_path: "data/train.csv"
   val_path: "data/val.csv"
   test_path: "data/test.csv"
-  train_images_path: "data/ml_ozon_images/ml_ozon_counterfeit_train_images"
-  test_images_path: "data/ml_ozon_images/ml_ozon_counterfeit_test_images"
+  train_images_path: "data/ml_ozon_counterfeit_train_images/ml_ozon_сounterfeit_train_images"
+  test_images_path: "data/ml_ozon_сounterfeit_test_images/ml_ozon_сounterfeit_test_images"
   num_workers: 4
   
 checkpointing:

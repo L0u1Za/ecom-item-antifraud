@@ -47,42 +47,20 @@ class ImageTower(nn.Module):
         self.proj = nn.Linear(self.backbone.num_features, cfg.model.image.projection_dim)
         self.image_norm = nn.LayerNorm(cfg.model.image.projection_dim)
         self.dropout = nn.Dropout(cfg.model.image.dropout)
-        
-        # Add sequence handling
-        self.seq_pool = nn.Sequential(
-            nn.Linear(cfg.model.image.projection_dim, cfg.model.image.projection_dim),
-            nn.LayerNorm(cfg.model.image.projection_dim),
-            nn.ReLU(),
-            nn.Dropout(cfg.model.image.dropout)
-        ) if cfg.model.image.get('pool_type', 'mean') == 'learned' else None
-        
+
         self.freeze()
         
     def forward(self, image_inputs: torch.Tensor) -> torch.Tensor:
-        # image_inputs['image'] shape: [batch_size, num_images, channels, height, width]
-        B, N, C, H, W = image_inputs.shape
-        
-        # Reshape to process all images
-        images = image_inputs.view(B * N, C, H, W)
-        
-        # Extract features for all images
-        features = self.backbone(images)  # [B*N, backbone_dim]
-        projected = self.proj(features)   # [B*N, proj_dim]
+        """
+        Args:
+            image_inputs: (B, C, H, W) tensor of images
+        Returns:
+            (B, proj_dim) tensor of image embeddings
+        """
+        features = self.backbone(image_inputs)
+        projected = self.proj(features)
         normalized = self.image_norm(projected)
         img_emb = self.dropout(normalized)
-        
-        # Reshape back to [batch_size, num_images, proj_dim]
-        img_emb = img_emb.view(B, N, -1)
-        
-        # Pool image sequence
-        if self.seq_pool is not None:
-            # Learned pooling
-            pooled = self.seq_pool(img_emb)
-            img_emb = pooled.mean(dim=1)  # [B, proj_dim]
-        else:
-            # Simple mean pooling
-            img_emb = img_emb.mean(dim=1)  # [B, proj_dim]
-            
         return img_emb
     
     def freeze(self):

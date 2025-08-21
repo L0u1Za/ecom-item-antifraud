@@ -53,26 +53,11 @@ class MultiModalCollator:
             return_tensors='pt'
         )
         
-        max_num_images = max(len(item['images']) for item in image_samples)
-        image_shape = self.config.preprocessing.image.size
-
-        padded_images = []
-        if max_num_images == 0:
-            # Ensure at least one placeholder image per item to avoid empty stack
-            images = torch.stack([
-                torch.zeros((1, 3, image_shape[0], image_shape[1]))
-                for _ in image_samples
-            ])
-        else:
-            for item in image_samples:
-                imgs = item['images']
-                if len(imgs) < max_num_images:
-                    pad_count = max_num_images - len(imgs)
-                    imgs = imgs + [torch.zeros((3, image_shape[0], image_shape[1]))] * pad_count
-                elif len(imgs) > max_num_images:
-                    imgs = imgs[:max_num_images]
-                padded_images.append(torch.stack(imgs))
-            images = torch.stack(padded_images)
+        images = []
+        for item in image_samples:
+            img = item['images']
+            images.append(img)
+        images = torch.stack(images)
 
         # Process tabular features to FTTransformer-compatible tensors
         cat_list = []
@@ -156,27 +141,12 @@ class MultiModalCollatorTest:
             max_length=self.max_length,
             return_tensors='pt'
         )
-        
-        max_num_images = max(len(item['images']) for item in image_samples)
-        image_shape = self.config.preprocessing.image.size
 
-        padded_images = []
-        if max_num_images == 0:
-            # Ensure at least one placeholder image per item to avoid empty stack
-            images = torch.stack([
-                torch.zeros((1, 3, image_shape[0], image_shape[1]))
-                for _ in image_samples
-            ])
-        else:
-            for item in image_samples:
-                imgs = item['images']
-                if len(imgs) < max_num_images:
-                    pad_count = max_num_images - len(imgs)
-                    imgs = imgs + [torch.zeros((3, image_shape[0], image_shape[1]))] * pad_count
-                elif len(imgs) > max_num_images:
-                    imgs = imgs[:max_num_images]
-                padded_images.append(torch.stack(imgs))
-            images = torch.stack(padded_images)
+        images = []
+        for item in image_samples:
+            img = item['images']
+            images.append(img)
+        images = torch.stack(images)
 
         # Process tabular features to FTTransformer-compatible tensors
         cat_list = []
