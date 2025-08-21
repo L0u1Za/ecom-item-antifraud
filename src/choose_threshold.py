@@ -42,6 +42,7 @@ def main(cfg: DictConfig) -> None:
 
     val_dataset = FraudDataset(
         data_path=val_data_path,
+        image_dir=cfg.experiment.data.train_images_path,
         text_processor=text_processor,
         image_processor=image_processor,
         tabular_processor=tabular_processor

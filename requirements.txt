@@ -2,7 +2,7 @@ numpy
 pandas
 scikit-learn
 torch==2.3.0
-torchmetrics
+torchmetrics==1.7.0
 matplotlib
 # torchvision
 # transformers

@@ -5,6 +5,7 @@ import hydra
 from omegaconf import DictConfig
 import math
 import pandas as pd
+import os
 
 from preprocessing.image.clip_validator import CLIPValidator
 
@@ -53,6 +54,18 @@ class TextProcessor:
         return obj
 
 class ImageProcessor:
+    def get_empty_image(self):
+        size = tuple(self.config.preprocessing.image.size)
+        if hasattr(self, 'clip_validator'):
+            return {
+                'images': [torch.zeros(3, size[0], size[1])],
+                'text_image_similarity': torch.tensor(0.0)
+            }
+        return {
+            'images': [torch.zeros(3, size[0], size[1])]
+        }
+        
+
     def __init__(self, 
                  config: DictConfig,
                  training=True):
@@ -97,30 +110,33 @@ class ImageProcessor:
         if config.preprocessing.image.compute_clip_similarity:
             self.clip_validator = CLIPValidator(config.preprocessing.image.clip_model, self.transform)
         
-    def __call__(self, data: Dict[str, Any]) -> Dict[str, torch.Tensor]:
-        images = data['images']
-        if images is None:
-            return {
-                "images": []
-            }
+    def __call__(self, image_path: str) -> Dict[str, torch.Tensor]:
+        if not image_path or not os.path.exists(image_path):
+            return self.get_empty_image()
+
+        try:
+            image = Image.open(image_path).convert("RGB")
+        except Exception:
+            return self.get_empty_image()
+
+        text = "" # Placeholder, as title is not passed directly anymore
         text = data.get('title', '')  # Get title for CLIP similarity
         
         # During training, apply augmentations to create one modified version
-        img_tensors = []
-        for image in images:
-            if self.training and self.augmentations:
-                # Apply augmentations sequentially with their probabilities
-                aug_image = image
-                for aug_transform, prob in self.augmentations:
-                    if torch.rand(1).item() < prob:
-                        aug_image = aug_transform(aug_image)
+        if self.training and self.augmentations:
+            # Apply augmentations sequentially with their probabilities
+            aug_image = image
+            for aug_transform, prob in self.augmentations:
+                if torch.rand(1).item() < prob:
+                    aug_image = aug_transform(aug_image)
                 
-                # Use augmented image as main input
-                img_tensor = self.transform(aug_image)
-            else:
-                # During inference, just use basic transform
-                img_tensor = self.transform(image)
-            img_tensors.append(img_tensor)
+            # Use augmented image as main input
+            img_tensor = self.transform(aug_image)
+        else:
+            # During inference, just use basic transform
+            img_tensor = self.transform(image)
+        
+        img_tensors = [img_tensor]
         
         obj = {
             'images': img_tensors

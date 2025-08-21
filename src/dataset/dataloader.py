@@ -19,6 +19,7 @@ class DataLoaderFactory:
         # Create datasets
         train_dataset = FraudDataset(
             data_path=config.experiment.data.train_path,
+            image_dir=config.experiment.data.train_images_path,
             text_processor=text_processor,
             image_processor=image_processor,
             tabular_processor=tabular_processor
@@ -26,6 +27,7 @@ class DataLoaderFactory:
         
         val_dataset = FraudDataset(
             data_path=config.experiment.data.val_path,
+            image_dir=config.experiment.data.train_images_path,
             text_processor=text_processor,
             image_processor=image_processor_test,
             tabular_processor=tabular_processor

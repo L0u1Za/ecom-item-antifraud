@@ -38,6 +38,7 @@ def main(cfg: DictConfig) -> None:
     print("Creating dataset and dataloader...")
     test_dataset = InferenceDataset(
         data_path=to_absolute_path(cfg.experiment.data.test_path),
+        image_dir=cfg.experiment.data.test_images_path,
         text_processor=text_processor,
         image_processor=image_processor,
         tabular_processor=tabular_processor
