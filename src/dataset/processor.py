@@ -6,6 +6,7 @@ from omegaconf import DictConfig
 import math
 import pandas as pd
 import os
+from PIL import Image
 
 from preprocessing.image.clip_validator import CLIPValidator
 
@@ -54,18 +55,6 @@ class TextProcessor:
         return obj
 
 class ImageProcessor:
-    def get_empty_image(self):
-        size = tuple(self.config.preprocessing.image.size)
-        if hasattr(self, 'clip_validator'):
-            return {
-                'images': [torch.zeros(3, size[0], size[1])],
-                'text_image_similarity': torch.tensor(0.0)
-            }
-        return {
-            'images': [torch.zeros(3, size[0], size[1])]
-        }
-        
-
     def __init__(self, 
                  config: DictConfig,
                  training=True):
@@ -97,20 +86,25 @@ class ImageProcessor:
                     _convert_="partial"
                 )
                 self.augmentations.append((
-                    transforms.Compose([
-                        transforms.Resize(size),
-                        aug_transform,
-                        transforms.ToTensor(),
-                        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                          std=[0.229, 0.224, 0.225])
-                    ]),
+                    aug_transform,
                     aug_config.probability
                 ))
 
         if config.preprocessing.image.compute_clip_similarity:
             self.clip_validator = CLIPValidator(config.preprocessing.image.clip_model, self.transform)
-        
-    def __call__(self, image_path: str) -> Dict[str, torch.Tensor]:
+
+    def get_empty_image(self):
+        size = tuple(self.config.preprocessing.image.size)
+        if hasattr(self, 'clip_validator'):
+            return {
+                'images': [torch.zeros(3, size[0], size[1])],
+                'text_image_similarity': torch.tensor(0.0)
+            }
+        return {
+            'images': [torch.zeros(3, size[0], size[1])]
+        }
+
+    def __call__(self, image_path: str, title: str = '') -> Dict[str, torch.Tensor]:
         if not image_path or not os.path.exists(image_path):
             return self.get_empty_image()
 
@@ -119,8 +113,7 @@ class ImageProcessor:
         except Exception:
             return self.get_empty_image()
 
-        text = "" # Placeholder, as title is not passed directly anymore
-        text = data.get('title', '')  # Get title for CLIP similarity
+        text = title
         
         # During training, apply augmentations to create one modified version
         if self.training and self.augmentations:

@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 from typing import Dict, Any, Tuple
 import torch
 import pandas as pd
+from hydra.utils import to_absolute_path
 
 class FraudDataset(Dataset):
     def __init__(self, 
@@ -11,7 +12,7 @@ class FraudDataset(Dataset):
                  text_processor=None,
                  image_processor=None,
                  tabular_processor=None):
-        self.image_dir = image_dir
+        self.image_dir = to_absolute_path(image_dir) if image_dir else None
         self.text_processor = text_processor
         self.image_processor = image_processor
         self.tabular_processor = tabular_processor
@@ -26,21 +27,21 @@ class FraudDataset(Dataset):
         
     def __getitem__(self, idx) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
         item = self.data.iloc[idx, ]
-        item_id = item['ItemID'] # Assuming ItemID is the index
+        item_id = int(item['ItemID']) # Assuming ItemID is the index
         
         text_obj = {'title': item['name_rus'], 'description': item['description'], 'brand_name': item['brand_name']}
         # Keep only relevant tabular columns: categorical + numerical from processor
         # Also exclude target label if present
         drop_cols = ['description', 'name_rus']
         if 'resolution' in item.index:
-            drop_cols.append('label')
+            drop_cols.append('resolution')
         tabular_obj = item.drop(drop_cols, errors='ignore').to_dict()
         
         image_path = os.path.join(self.image_dir, f"{item_id}.png") if self.image_dir else None
 
         processed = {
             'text': self.text_processor(text_obj) if self.text_processor else None,
-            'images': self.image_processor(image_path) if self.image_processor and image_path and os.path.exists(image_path) else self.image_processor.get_empty_image(),
+            'images': self.image_processor(image_path, text_obj['title']) if self.image_processor else None,
             'tabular': self.tabular_processor(tabular_obj) if self.tabular_processor else None
         }
         
@@ -55,7 +56,7 @@ class InferenceDataset(Dataset):
                  text_processor=None,
                  image_processor=None,
                  tabular_processor=None):
-        self.image_dir = image_dir
+        self.image_dir = to_absolute_path(image_dir) if image_dir else None
         self.text_processor = text_processor
         self.image_processor = image_processor
         self.tabular_processor = tabular_processor
@@ -71,10 +72,12 @@ class InferenceDataset(Dataset):
         
     def __getitem__(self, idx) -> Dict[str, Any]:
         item = self.data.iloc[idx, ]
-        item_id = item['ItemID']
+        item_id = int(item['ItemID'])
         
         text_obj = {'title': item['name_rus'], 'description': item['description'], 'brand_name': item['brand_name']}
         drop_cols = ['description', 'name_rus']
+        if 'resolution' in item.index:
+            drop_cols.append('resolution')
         tabular_obj = item.drop(drop_cols, errors='ignore').to_dict()
 
         image_path = os.path.join(self.image_dir, f"{item_id}.png") if self.image_dir else None
@@ -82,7 +85,7 @@ class InferenceDataset(Dataset):
         processed = {
             'item_id': item['id'],
             'text': self.text_processor(text_obj) if self.text_processor else None,
-            'images': self.image_processor(image_path) if self.image_processor and image_path and os.path.exists(image_path) else self.image_processor.get_empty_image(),
+            'images': self.image_processor(image_path, text_obj['title']) if self.image_processor else None,
             'tabular': self.tabular_processor(tabular_obj) if self.tabular_processor else None
         }
         
