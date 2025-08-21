@@ -8,7 +8,7 @@ model:
     
   image:
     enabled: true
-    name: "resnet50"
+    name: "efficientnet_b0"
     pretrained: true
     projection_dim: 256
     dropout: 0.3
