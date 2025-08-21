@@ -108,7 +108,7 @@ def main(cfg: DictConfig) -> None:
     plt.legend()
     plt.grid(True)
     
-    output_path = 'pr_curve.png'
+    output_path = to_absolute_path(cfg.inference.pr_curve_path)
     plt.savefig(output_path)
     print(f"Saved PR curve plot to {output_path}")
 
