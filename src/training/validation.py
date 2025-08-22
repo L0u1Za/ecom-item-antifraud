@@ -69,7 +69,8 @@ class Validator:
         metrics = self.calculate_metrics(all_labels, predictions)
         metrics['loss'] = avg_loss
 
-        return metrics
+        # Return metrics and the first batch of data for logging
+        return metrics, (all_probs, all_labels, self.dataloader.dataset)
 
     def calculate_metrics(self, true_labels, predictions):
         accuracy = accuracy_score(true_labels, predictions)

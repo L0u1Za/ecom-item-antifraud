@@ -150,7 +150,7 @@ class Trainer:
             self.logger.info(f"Epoch {epoch+1} train_loss={avg_loss:.4f} time={(time.time()-epoch_start):.1f}s")
 
             # Validation with progress bar
-            val_metrics = self.validator.validate(show_progress=True)
+            val_metrics, (val_probs, val_labels, val_dataset) = self.validator.validate(show_progress=True)
             val_loss = val_metrics.pop('loss', float('inf'))
             self.logger.info(
                 f"Epoch {epoch+1} val_loss={val_loss:.4f} "
@@ -170,8 +170,9 @@ class Trainer:
                     "learning_rate": current_lr
                 }
                 self.wandb_logger.log_epoch(epoch, metrics)
+                # self.wandb_logger.log_predictions_table(epoch, val_probs, val_labels, val_dataset)
 
-                # Step scheduler
+            # Step scheduler
             if self.scheduler is not None:
                 if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                     self.scheduler.step(val_loss)

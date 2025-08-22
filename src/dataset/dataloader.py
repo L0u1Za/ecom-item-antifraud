@@ -22,7 +22,8 @@ class DataLoaderFactory:
             image_dir=config.experiment.data.train_images_path,
             text_processor=text_processor,
             image_processor=image_processor,
-            tabular_processor=tabular_processor
+            tabular_processor=tabular_processor,
+            model_config=config.model.model
         )
         
         val_dataset = FraudDataset(
@@ -30,7 +31,8 @@ class DataLoaderFactory:
             image_dir=config.experiment.data.train_images_path,
             text_processor=text_processor,
             image_processor=image_processor_test,
-            tabular_processor=tabular_processor
+            tabular_processor=tabular_processor,
+            model_config=config.model.model
         )
         # Create collator
         collator = MultiModalCollator(config)

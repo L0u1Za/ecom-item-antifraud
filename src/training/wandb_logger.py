@@ -1,5 +1,8 @@
 import wandb
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, List
+import torch
+from torch.utils.data import Dataset
+
 
 class WandBLogger:
     def __init__(self, project_name: str, config: Dict[str, Any] = None):
@@ -26,6 +29,42 @@ class WandBLogger:
         """Log epoch-level metrics"""
         metrics["epoch"] = epoch
         wandb.log(metrics)
+
+    def log_predictions_table(self, epoch: int, probs: List[float], labels: List[int], dataset: Dataset, num_examples: int = 10):
+        """Log a table of model predictions to wandb"""
+        # Create a wandb.Table
+        columns = ["item_id", "prediction", "ground_truth", "title", "description", "image"]
+        table = wandb.Table(columns=columns)
+
+        # Limit the number of examples to log
+        num_examples = min(num_examples, len(probs))
+
+        for i, (prob, label) in enumerate(zip(probs[:num_examples], labels[:num_examples])):
+            # Fetch the original data item
+            item = dataset.data.iloc[i]
+            item_id = int(item['ItemID'])
+            title = item.get('title', '')
+            description = item.get('description', '')
+
+            # Get image if available
+            image_path = dataset.get_image_path(i)
+            if image_path:
+                image = wandb.Image(image_path)
+            else:
+                image = None
+
+            # Add data to the table
+            table.add_data(
+                item_id,
+                prob,
+                label,
+                title,
+                description,
+                image
+            )
+
+        # Log the table
+        wandb.log({f"epoch_{epoch}_predictions": table})
     
     def save_model(self, path: str):
         """Save model artifact"""

@@ -34,63 +34,45 @@ class MultiModalCollator:
         Returns:
             Dictionary with batched and padded tensors
         """
-        # Separate modalities
-        text_samples = [b[0]['text'] for b in batch]
-        image_samples = [b[0]['images'] for b in batch]
-        tabular_samples = [b[0]['tabular'] for b in batch]
         labels = [b[1] for b in batch]
-        # Process text
-        titles = [t['title'] for t in text_samples]
-        descriptions = [t['description'] for t in text_samples]
-        
-        # Tokenize text (handles padding automatically)
-        encoded_text = self.tokenizer(
-            titles,
-            descriptions,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors='pt'
-        )
-        
-        images = []
-        for item in image_samples:
-            img = item['images']
-            images.append(img)
-        images = torch.stack(images)
+        batch_dict = {}
 
-        # Process tabular features to FTTransformer-compatible tensors
-        cat_list = []
-        cont_list = []
-        for t in tabular_samples:
-            cat_list.append(t['categorical'])
-            cont_list.append(t['continuous'])
-
-        categorical = torch.stack(cat_list) if len(cat_list) > 0 else torch.zeros((len(batch), 0), dtype=torch.long)
-        # Handle possible zero-length continuous features
-        if cont_list and cont_list[0].numel() > 0:
-            continuous = torch.stack(cont_list)
-        else:
-            continuous = torch.zeros((len(batch), 0), dtype=torch.float32)
-        
-        if getattr(self.config.preprocessing.image, 'compute_clip_similarity', False):
-            clip_similarities = [item.get('text_image_similarity', torch.tensor(0.0)) for item in image_samples]
-            clip_similarities = torch.stack(clip_similarities).unsqueeze(1)
-            continuous = torch.cat([continuous, clip_similarities], dim=1) if continuous.numel() > 0 else clip_similarities
-        
-        # Construct final batch
-        batch_dict = {
-            'text': {
+        # Process text if present
+        text_samples = [b[0]['text'] for b in batch if b[0].get('text') is not None]
+        if text_samples:
+            titles = [t['title'] for t in text_samples]
+            descriptions = [t['description'] for t in text_samples]
+            encoded_text = self.tokenizer(
+                titles, descriptions, padding=True, truncation=True,
+                max_length=self.max_length, return_tensors='pt'
+            )
+            batch_dict['text'] = {
                 'input_ids': encoded_text['input_ids'],
                 'attention_mask': encoded_text['attention_mask'],
                 'token_type_ids': encoded_text.get('token_type_ids')
-            },
-            'images': images,
-            'tabular': {
-                'categorical': categorical,
-                'continuous': continuous
             }
-        }
+
+        # Process images if present
+        image_samples = [b[0]['images'] for b in batch if b[0].get('images') is not None]
+        if image_samples:
+            images = [item['images'] for item in image_samples]
+            batch_dict['images'] = torch.stack(images)
+
+        # Process tabular if present
+        tabular_samples = [b[0]['tabular'] for b in batch if b[0].get('tabular') is not None]
+        if tabular_samples:
+            cat_list = [t['categorical'] for t in tabular_samples]
+            cont_list = [t['continuous'] for t in tabular_samples]
+            
+            categorical = torch.stack(cat_list) if cat_list else torch.zeros((len(batch), 0), dtype=torch.long)
+            continuous = torch.stack(cont_list) if cont_list and cont_list[0].numel() > 0 else torch.zeros((len(batch), 0), dtype=torch.float32)
+
+            if getattr(self.config.preprocessing.image, 'compute_clip_similarity', False) and image_samples:
+                clip_similarities = [item.get('text_image_similarity', torch.tensor(0.0)) for item in image_samples]
+                clip_similarities = torch.stack(clip_similarities).unsqueeze(1)
+                continuous = torch.cat([continuous, clip_similarities], dim=1) if continuous.numel() > 0 else clip_similarities
+            
+            batch_dict['tabular'] = {'categorical': categorical, 'continuous': continuous}
 
         return batch_dict, torch.stack(labels)
 
@@ -123,63 +105,44 @@ class MultiModalCollatorTest:
         Returns:
             Dictionary with batched and padded tensors
         """
-        # Separate modalities
-        text_samples = [b['text'] for b in batch]
-        image_samples = [b['images'] for b in batch]
-        tabular_samples = [b['tabular'] for b in batch]
         item_ids = [b['item_id'] for b in batch]
-        # Process text
-        titles = [t['title'] for t in text_samples]
-        descriptions = [t['description'] for t in text_samples]
-        
-        # Tokenize text (handles padding automatically)
-        encoded_text = self.tokenizer(
-            titles,
-            descriptions,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors='pt'
-        )
+        batch_dict = {"item_id": item_ids}
 
-        images = []
-        for item in image_samples:
-            img = item['images']
-            images.append(img)
-        images = torch.stack(images)
-
-        # Process tabular features to FTTransformer-compatible tensors
-        cat_list = []
-        cont_list = []
-        for t in tabular_samples:
-            cat_list.append(t['categorical'])
-            cont_list.append(t['continuous'])
-
-        categorical = torch.stack(cat_list) if len(cat_list) > 0 else torch.zeros((len(batch), 0), dtype=torch.long)
-        # Handle possible zero-length continuous features
-        if cont_list and cont_list[0].numel() > 0:
-            continuous = torch.stack(cont_list)
-        else:
-            continuous = torch.zeros((len(batch), 0), dtype=torch.float32)
-        
-        if getattr(self.config.preprocessing.image, 'compute_clip_similarity', False):
-            clip_similarities = [item.get('text_image_similarity', torch.tensor(0.0)) for item in image_samples]
-            clip_similarities = torch.stack(clip_similarities).unsqueeze(1)
-            continuous = torch.cat([continuous, clip_similarities], dim=1) if continuous.numel() > 0 else clip_similarities
-        
-        # Construct final batch
-        batch_dict = {
-            "item_id": item_ids,
-            'text': {
+        # Process text if present
+        text_samples = [b['text'] for b in batch if b.get('text') is not None]
+        if text_samples:
+            titles = [t['title'] for t in text_samples]
+            descriptions = [t['description'] for t in text_samples]
+            encoded_text = self.tokenizer(
+                titles, descriptions, padding=True, truncation=True,
+                max_length=self.max_length, return_tensors='pt'
+            )
+            batch_dict['text'] = {
                 'input_ids': encoded_text['input_ids'],
                 'attention_mask': encoded_text['attention_mask'],
                 'token_type_ids': encoded_text.get('token_type_ids')
-            },
-            'images': images,
-            'tabular': {
-                'categorical': categorical,
-                'continuous': continuous
             }
-        }
+
+        # Process images if present
+        image_samples = [b['images'] for b in batch if b.get('images') is not None]
+        if image_samples:
+            images = [item['images'] for item in image_samples]
+            batch_dict['images'] = torch.stack(images)
+
+        # Process tabular if present
+        tabular_samples = [b['tabular'] for b in batch if b.get('tabular') is not None]
+        if tabular_samples:
+            cat_list = [t['categorical'] for t in tabular_samples]
+            cont_list = [t['continuous'] for t in tabular_samples]
+            
+            categorical = torch.stack(cat_list) if cat_list else torch.zeros((len(batch), 0), dtype=torch.long)
+            continuous = torch.stack(cont_list) if cont_list and cont_list[0].numel() > 0 else torch.zeros((len(batch), 0), dtype=torch.float32)
+
+            if getattr(self.config.preprocessing.image, 'compute_clip_similarity', False) and image_samples:
+                clip_similarities = [item.get('text_image_similarity', torch.tensor(0.0)) for item in image_samples]
+                clip_similarities = torch.stack(clip_similarities).unsqueeze(1)
+                continuous = torch.cat([continuous, clip_similarities], dim=1) if continuous.numel() > 0 else clip_similarities
+            
+            batch_dict['tabular'] = {'categorical': categorical, 'continuous': continuous}
 
         return batch_dict

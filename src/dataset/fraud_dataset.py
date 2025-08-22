@@ -11,11 +11,12 @@ class FraudDataset(Dataset):
                  image_dir=None,
                  text_processor=None,
                  image_processor=None,
-                 tabular_processor=None):
+                 tabular_processor=None,
+                 model_config=None):
         self.image_dir = to_absolute_path(image_dir) if image_dir else None
-        self.text_processor = text_processor
-        self.image_processor = image_processor
-        self.tabular_processor = tabular_processor
+        self.text_processor = text_processor if (model_config is None or model_config.text.enabled) else None
+        self.image_processor = image_processor if (model_config is None or model_config.image.enabled) else None
+        self.tabular_processor = tabular_processor if (model_config is None or model_config.tabular.enabled) else None
         
         self.data = pd.read_csv(data_path, index_col=0)
         self.data['brand_name'] = self.data['brand_name'].astype('str')
@@ -39,14 +40,23 @@ class FraudDataset(Dataset):
         
         image_path = os.path.join(self.image_dir, f"{item_id}.png") if self.image_dir else None
 
-        processed = {
-            'text': self.text_processor(text_obj) if self.text_processor else None,
-            'images': self.image_processor(image_path, text_obj['title']) if self.image_processor else None,
-            'tabular': self.tabular_processor(tabular_obj) if self.tabular_processor else None
-        }
+        processed = {}
+        processed['text'] = self.text_processor(text_obj) if self.text_processor else None
+    
+        processed['images'] = self.image_processor(image_path, text_obj['title']) if self.image_processor else None
+    
+        processed['tabular'] = self.tabular_processor(tabular_obj) if self.tabular_processor else None
         
         label = torch.tensor(item['resolution'], dtype=torch.float32)
         return processed, label
+
+    def get_image_path(self, idx: int):
+        if not self.image_dir:
+            return None
+        item = self.data.iloc[idx, ]
+        item_id = int(item['ItemID'])
+        image_path = os.path.join(self.image_dir, f"{item_id}.png")
+        return image_path if os.path.exists(image_path) else None
 
 
 class InferenceDataset(Dataset):
@@ -55,11 +65,12 @@ class InferenceDataset(Dataset):
                  image_dir=None,
                  text_processor=None,
                  image_processor=None,
-                 tabular_processor=None):
+                 tabular_processor=None,
+                 model_config=None):
         self.image_dir = to_absolute_path(image_dir) if image_dir else None
-        self.text_processor = text_processor
-        self.image_processor = image_processor
-        self.tabular_processor = tabular_processor
+        self.text_processor = text_processor if (model_config is None or model_config.text.enabled) else None
+        self.image_processor = image_processor if (model_config is None or model_config.image.enabled) else None
+        self.tabular_processor = tabular_processor if (model_config is None or model_config.tabular.enabled) else None
         
         self.data = pd.read_csv(data_path)
         # Ensure correct dtypes
@@ -82,11 +93,20 @@ class InferenceDataset(Dataset):
 
         image_path = os.path.join(self.image_dir, f"{item_id}.png") if self.image_dir else None
 
-        processed = {
-            'item_id': item['id'],
-            'text': self.text_processor(text_obj) if self.text_processor else None,
-            'images': self.image_processor(image_path, text_obj['title']) if self.image_processor else None,
-            'tabular': self.tabular_processor(tabular_obj) if self.tabular_processor else None
-        }
+        processed = {'item_id': item['id']}
+
+        processed['text'] = self.text_processor(text_obj) if self.text_processor else None
+    
+        processed['images'] = self.image_processor(image_path, text_obj['title']) if self.image_processor else None
+    
+        processed['tabular'] = self.tabular_processor(tabular_obj) if self.tabular_processor else None
         
         return processed
+
+    def get_image_path(self, idx: int):
+        if not self.image_dir:
+            return None
+        item = self.data.iloc[idx, ]
+        item_id = int(item['id'])
+        image_path = os.path.join(self.image_dir, f"{item_id}.png")
+        return image_path if os.path.exists(image_path) else None
