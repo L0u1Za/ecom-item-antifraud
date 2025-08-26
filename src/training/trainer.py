@@ -57,6 +57,26 @@ class Trainer:
             self.wandb_logger = WandBLogger(project_name, wandb_config)
             self.wandb_logger.watch_model(model)
 
+    def load_checkpoint(self, path: str):
+        """Load model checkpoint from a given path."""
+        if not path or not Path(path).exists():
+            self.logger.warning(f"Checkpoint path '{path}' not found. Starting from scratch.")
+            return 0
+            
+        self.logger.info(f"Loading checkpoint from {path}")
+        checkpoint = torch.load(path, map_location=self.device)
+        
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        
+        if self.scheduler and checkpoint.get('scheduler_state_dict'):
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            
+        start_epoch = checkpoint.get('epoch', -1) + 1
+        self.logger.info(f"Resuming training from epoch {start_epoch}")
+        
+        return start_epoch
+
     def save_checkpoint(self, model_state, is_best: bool = False, epoch: int = None):
         """Save model checkpoint using config settings"""
         if not hasattr(self, 'config') or self.config is None:
@@ -105,8 +125,16 @@ class Trainer:
     def train(self):
         self.model.to(self.device)
         best_val_loss = float('inf')
+        start_epoch = 0
 
-        for epoch in range(self.epochs):
+        if self.config.training.get('resume_training', False):
+            checkpoint_path = self.config.training.get('checkpoint_path')
+            if checkpoint_path:
+                start_epoch = self.load_checkpoint(checkpoint_path)
+            else:
+                self.logger.warning("`resume_training` is true, but no `checkpoint_path` provided. Starting from scratch.")
+
+        for epoch in range(start_epoch, self.epochs):
             self.model.train()
             epoch_start = time.time()
             total_loss = 0.0

@@ -1,5 +1,7 @@
 epochs: 20
-batch_size: 64
+resume_training: false
+checkpoint_path: null
+batch_size: 128
 
 criterion:
   _target_: "torch.nn.BCEWithLogitsLoss"
