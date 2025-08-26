@@ -5,78 +5,53 @@ categorical_cols:
   - CommercialTypeName4
   
 numerical_cols:
-  - rating_1_count
-  - rating_2_count
-  - rating_3_count
-  - rating_4_count
-  - rating_5_count
-  - comments_published_count
-  - photos_published_count
-  - videos_published_count
+  - seller_avg_price
+  - seller_avg_item_time_alive
+  - seller_median_price
   - PriceDiscounted
-  - item_time_alive
-  - item_count_fake_returns7
-  - item_count_fake_returns30
-  - item_count_fake_returns90
-  - item_count_sales7
-  - item_count_sales30
-  - item_count_sales90
-  - item_count_returns7
-  - item_count_returns30
-  - item_count_returns90
-  - GmvTotal7
-  - GmvTotal30
-  - GmvTotal90
-  - ExemplarAcceptedCountTotal7
-  - ExemplarAcceptedCountTotal30
-  - ExemplarAcceptedCountTotal90
-  - OrderAcceptedCountTotal7
-  - OrderAcceptedCountTotal30
-  - OrderAcceptedCountTotal90
-  - ExemplarReturnedCountTotal7
-  - ExemplarReturnedCountTotal30
-  - ExemplarReturnedCountTotal90
-  - ExemplarReturnedValueTotal7
-  - ExemplarReturnedValueTotal30
-  - ExemplarReturnedValueTotal90
-  - ItemVarietyCount
-  - ItemAvailableCount
-  - seller_time_alive # After this there are generated vars
-  # - return_rate_30
-  # - fake_return_rate_30
-  # - refund_value_ratio_30
-  # - sales_growth_7_30
-  # - sales_growth_30_90
-  # - sales_velocity
-  # - seller_velocity
-  - desc_len
-  - desc_word_count
-  - name_len
-  # - price_return_interaction
-  # - gmv_per_day
-  - anomaly_score
   - seller_total_items
-  - seller_total_sales
-  - seller_avg_return_rate
-  - fraud_desc_brand_names
-  - fraud_desc_messenger
-  - fraud_desc_mixed_alphabets
-  - fraud_desc_phone
-  - fraud_desc_repeated_chars
-  - fraud_desc_short_description
-  - fraud_desc_suspicious_keywords
-  - fraud_desc_suspicious_numbers
-  - fraud_desc_title_description_mismatch
-  - fraud_desc_unusual_punct
-  - fraud_desc_url
-  - fraud_title_brand_names
-  - fraud_title_messenger
-  - fraud_title_mixed_alphabets
-  - fraud_title_phone
-  - fraud_title_repeated_chars
-  - fraud_title_short_description
-  - fraud_title_suspicious_keywords
-  - fraud_title_suspicious_numbers
+  - seller_variety_mean
+  - seller_avg_rating_5_share
+  - ItemVarietyCount
+  - item_time_alive
+  - seller_total_order_accepted_30
+  - desc_len
+  - name_len
+  - gmv_per_day
+  - seller_total_gmv_30
+  - desc_word_count
+  - ItemAvailableCount
+  - seller_available_mean
   - fraud_title_title_description_mismatch
-  - fraud_title_unusual_punct
+  - fraud_desc_title_description_mismatch
+  - seller_total_exemplar_accepted_30
+  - seller_time_alive_y
+  - seller_time_alive_x
+  - seller_total_exemplar_returned_30
+  - seller_total_gmv_90
+  - seller_total_sales
+  - seller_sum_rating_5
+  - seller_total_exemplar_returned_value_30
+  - GmvTotal90
+  - ExemplarReturnedValueTotal90
+  - seller_total_fake_returns_90
+  - GmvTotal30
+  - seller_total_photos
+  - ExemplarReturnedCountTotal90
+  - seller_sum_rating_1
+  - seller_avg_return_rate
+  - fraud_title_short_description
+  - seller_sum_rating_4
+  - OrderAcceptedCountTotal90
+  - rating_5_count
+  - ExemplarAcceptedCountTotal90
+  - seller_total_videos
+  - seller_sum_rating_3
+  - fraud_desc_suspicious_numbers
+  - ExemplarReturnedValueTotal7
+  - seller_sum_rating_2
+  - ExemplarAcceptedCountTotal30
+  - OrderAcceptedCountTotal30
+  - seller_total_fake_returns_30
+
 scaling: "standard"

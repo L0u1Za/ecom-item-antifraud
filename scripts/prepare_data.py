@@ -120,9 +120,40 @@ def add_engineered_features(df_train, df_test):
     seller_stats = df_train.groupby('SellerID').agg(
         seller_total_items=('ItemID','count'),
         seller_total_sales=('item_count_sales30','sum'),
-        seller_avg_return_rate=('return_rate_30','mean')
+        seller_avg_return_rate=('return_rate_30','mean'),
+        # Новые признаки:
+        seller_total_gmv_30=('GmvTotal30', 'sum'),
+        seller_total_gmv_90=('GmvTotal90', 'sum'),
+        seller_avg_price=('PriceDiscounted', 'mean'),
+        seller_median_price=('PriceDiscounted', 'median'),
+        seller_total_returns_30=('item_count_returns30', 'sum'),
+        seller_total_returns_90=('item_count_returns90', 'sum'),
+        seller_total_fake_returns_30=('item_count_fake_returns30', 'sum'),
+        seller_total_fake_returns_90=('item_count_fake_returns90', 'sum'),
+        seller_sum_rating_1=('rating_1_count', 'sum'),
+        seller_sum_rating_2=('rating_2_count', 'sum'),
+        seller_sum_rating_3=('rating_3_count', 'sum'),
+        seller_sum_rating_4=('rating_4_count', 'sum'),
+        seller_sum_rating_5=('rating_5_count', 'sum'),
+        seller_total_photos=('photos_published_count', 'sum'),
+        seller_total_videos=('videos_published_count', 'sum'),
+        seller_avg_item_time_alive=('item_time_alive', 'mean'),
+        seller_variety_mean=('ItemVarietyCount', 'mean'),
+        seller_available_mean=('ItemAvailableCount', 'mean'),
+        seller_total_exemplar_accepted_30=('ExemplarAcceptedCountTotal30', 'sum'),
+        seller_total_order_accepted_30=('OrderAcceptedCountTotal30', 'sum'),
+        seller_total_exemplar_returned_30=('ExemplarReturnedCountTotal30', 'sum'),
+        seller_total_exemplar_returned_value_30=('ExemplarReturnedValueTotal30', 'sum'),
+        seller_time_alive=('seller_time_alive', 'mean'),  # если уникально для продавца, можно брать max/min/mean
     ).reset_index()
-
+    seller_stats['seller_avg_rating_5_share'] = (
+        seller_stats['seller_sum_rating_5'] /
+        (seller_stats['seller_sum_rating_1'] +
+        seller_stats['seller_sum_rating_2'] +
+        seller_stats['seller_sum_rating_3'] +
+        seller_stats['seller_sum_rating_4'] +
+        seller_stats['seller_sum_rating_5'] + 1e-6)
+    )
     # Get numeric columns for anomaly detection
     numeric_columns = df_train.select_dtypes(include=[np.number]).columns.tolist()
     # Remove target column if present
@@ -138,7 +169,7 @@ def add_engineered_features(df_train, df_test):
         df['anomaly_score'] = iso.predict(df[numeric_columns].fillna(0))
     
     df_train = df_train.merge(seller_stats, on='SellerID', how='left')
-    df_test = df_train.merge(seller_stats, on='SellerID', how='left')
+    df_test = df_test.merge(seller_stats, on='SellerID', how='left')
     return df_train, df_test
 
 
@@ -189,12 +220,12 @@ def prepare_data(config, train_path=None, test_path=None, output_dir=None):
     df_train[cat_cols] = df_train[cat_cols].fillna("unknown")
     df_test[cat_cols] = df_test[cat_cols].fillna("unknown")
     
+    # Add engineered features
+    df_train, df_test = add_engineered_features(df_train, df_test)
+    
     # Clean and process text data using config
     df_train = clean_and_process_text(df_train, config)
     df_test = clean_and_process_text(df_test, config)
-    
-    # Add engineered features
-    df_train, df_test = add_engineered_features(df_train, df_test)
     
     # Save prepared datasets
     print("Saving prepared datasets...")
