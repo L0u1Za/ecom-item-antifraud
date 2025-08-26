@@ -7,7 +7,7 @@ model:
     dropout: 0.3
     
   image:
-    enabled: true
+    enabled: false
     name: "efficientnet_b0"
     pretrained: true
     projection_dim: 256
