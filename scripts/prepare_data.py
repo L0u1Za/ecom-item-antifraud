@@ -135,9 +135,10 @@ def add_engineered_features(df_train, df_test):
     iso.fit(df_train[numeric_columns].fillna(0))
 
     for df in [df_train, df_test]:
-        df = df.merge(seller_stats, on='SellerID', how='left')
         df['anomaly_score'] = iso.predict(df[numeric_columns].fillna(0))
-
+    
+    df_train = df_train.merge(seller_stats, on='SellerID', how='left')
+    df_test = df_train.merge(seller_stats, on='SellerID', how='left')
     return df_train, df_test
 
 
