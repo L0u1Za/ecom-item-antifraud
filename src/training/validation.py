@@ -79,10 +79,10 @@ class Validator:
         f1 = f1_score(true_labels, predictions, average='binary')
 
         return {
-            'accuracy': accuracy,
-            'precision': precision,
-            'recall': recall,
-            'f1_score': f1,
+            'val_accuracy': accuracy,
+            'val_precision': precision,
+            'val_recall': recall,
+            'val_f1_score': f1,
             'threshold': self.threshold
         }
 

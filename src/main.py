@@ -97,8 +97,8 @@ def main(cfg: DictConfig) -> None:
     # Initialize trainer
     trainer = Trainer(
         model=model,
-        train_loader=dataloaders['train'],
-        val_loader=dataloaders['val'],
+        train_loader=dataloaders.get('train'),
+        val_loader=dataloaders.get('val'),
         optimizer=optimizer,
         criterion=criterion,
         epochs=cfg.training.epochs,

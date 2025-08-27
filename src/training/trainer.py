@@ -9,16 +9,18 @@ from pathlib import Path
 from omegaconf import DictConfig
 from tqdm import tqdm
 import time
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import numpy as np
 
 class Trainer:
-    def __init__(self, 
-                 model, 
-                 train_loader: DataLoader, 
-                 val_loader: DataLoader, 
-                 optimizer, 
-                 criterion, 
-                 epochs: int, 
-                 device: str,
+    def __init__(self,
+                 model,
+                 train_loader: DataLoader,
+                 val_loader: DataLoader = None,  # allow None
+                 optimizer=None,
+                 criterion=None,
+                 epochs: int = 1,
+                 device: str = "cpu",
                  scheduler: _LRScheduler = None,
                  config: DictConfig = None):
         self.model = model
@@ -31,15 +33,18 @@ class Trainer:
         self.scheduler = scheduler
         self.logger = setup_logger('fraud_detection', 'fraud_detection.log')
         self.config = config
-
-        # Initialize validator
-        self.validator = Validator(
-            model=model,
-            dataloader=val_loader,
-            device=device,
-            criterion=criterion,
-            threshold=config.training.validation.threshold  # Initial threshold, can be optimized during training
-        )
+        self.threshold = config.training.validation.threshold
+    
+        # Only initialize validator if val_loader is provided
+        self.validator = None
+        if val_loader is not None:
+            self.validator = Validator(
+                model=model,
+                dataloader=val_loader,
+                device=device,
+                criterion=criterion,
+                threshold=config.training.validation.threshold
+            )
         
         if config.experiment.wandb.enabled == True:
             project_name = config.experiment.wandb.project
@@ -140,6 +145,9 @@ class Trainer:
             total_loss = 0.0
             running = 0.0
 
+            train_preds = []
+            train_labels = []
+
             pbar = tqdm(self.train_loader, desc=f"Epoch {epoch+1}/{self.epochs}", leave=False)
             for batch_idx, batch in enumerate(pbar):
                 inputs, labels = batch
@@ -164,6 +172,11 @@ class Trainer:
                 current_lr = self.optimizer.param_groups[0]['lr']
                 pbar.set_postfix(loss=f"{loss.item():.4f}", avg=f"{running:.4f}", lr=f"{current_lr:.2e}")
 
+                # Collect predictions and labels for metrics
+                preds = torch.sigmoid(outputs).detach().cpu().numpy()
+                train_preds.extend(preds)
+                train_labels.extend(labels.detach().cpu().numpy())
+                
                 # Log batch metrics
                 if hasattr(self, 'wandb_logger') and batch_idx % 100 == 0:  # Log every 100 batches
                     self.wandb_logger.log_batch(
@@ -175,28 +188,55 @@ class Trainer:
             pbar.close()
 
             avg_loss = total_loss / len(self.train_loader)
-            self.logger.info(f"Epoch {epoch+1} train_loss={avg_loss:.4f} time={(time.time()-epoch_start):.1f}s")
+
+            # Calculate train metrics
+            train_preds_bin = (np.array(train_preds).squeeze() > self.threshold).astype(int)
+            train_labels_arr = np.array(train_labels).squeeze()
+            train_acc = accuracy_score(train_labels_arr, train_preds_bin)
+            train_prec = precision_score(train_labels_arr, train_preds_bin, zero_division=0)
+            train_rec = recall_score(train_labels_arr, train_preds_bin, zero_division=0)
+            train_f1 = f1_score(train_labels_arr, train_preds_bin, zero_division=0)
+
+            self.logger.info(
+                f"Epoch {epoch+1} train_loss={avg_loss:.4f} "
+                f"acc={train_acc:.4f} "
+                f"prec={train_prec:.4f} "
+                f"rec={train_rec:.4f} "
+                f"f1={train_f1:.4f} "
+                f"time={(time.time()-epoch_start):.1f}s"
+            )
 
             # Validation with progress bar
-            val_metrics, (val_probs, val_labels, val_dataset) = self.validator.validate(show_progress=True)
-            val_loss = val_metrics.pop('loss', float('inf'))
-            self.logger.info(
-                f"Epoch {epoch+1} val_loss={val_loss:.4f} "
-                f"acc={val_metrics.get('accuracy', 0):.4f} "
-                f"prec={val_metrics.get('precision', 0):.4f} "
-                f"rec={val_metrics.get('recall', 0):.4f} "
-                f"f1={val_metrics.get('f1_score', 0):.4f}"
-            )
+            # Only run validation if validator exists
+            val_loss = None
+            val_metrics = {}
+            if self.validator is not None:
+                val_metrics, (val_probs, val_labels, val_dataset) = self.validator.validate(show_progress=True)
+                val_loss = val_metrics.pop('loss', float('inf'))
+                self.logger.info(
+                    f"Epoch {epoch+1} val_loss={val_loss:.4f} "
+                    f"acc={val_metrics.get('val_accuracy', 0):.4f} "
+                    f"prec={val_metrics.get('val_precision', 0):.4f} "
+                    f"rec={val_metrics.get('val_recall', 0):.4f} "
+                    f"f1={val_metrics.get('val_f1_score', 0):.4f}"
+                )
 
             if hasattr(self, 'wandb_logger'):
                 current_lr = self.optimizer.param_groups[0]['lr']
                 # Log metrics
                 metrics = {
                     "train_loss": avg_loss,
-                    "val_loss": val_loss,
-                    **val_metrics,
+                    "train_accuracy": train_acc,
+                    "train_precision": train_prec,
+                    "train_recall": train_rec,
+                    "train_f1_score": train_f1,
                     "learning_rate": current_lr
                 }
+                if self.validator is not None:
+                    metrics.update({
+                        "val_loss": val_loss,
+                        **val_metrics
+                    })
                 self.wandb_logger.log_epoch(epoch, metrics)
                 # self.wandb_logger.log_predictions_table(epoch, val_probs, val_labels, val_dataset)
 

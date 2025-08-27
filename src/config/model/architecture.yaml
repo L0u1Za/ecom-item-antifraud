@@ -1,17 +1,19 @@
 model:
   text:
     enabled: true
+    unfreeze: false
     name: "cointegrated/rubert-tiny2"
     pretrained: true
     projection_dim: 256
-    dropout: 0.3
+    dropout: 0.2
     
   image:
     enabled: true
+    unfreeze: false
     name: "efficientnet_b0"
     pretrained: true
     projection_dim: 256
-    dropout: 0.3
+    dropout: 0.2
     
   tabular:
     enabled: true
@@ -23,10 +25,11 @@ model:
     depth: 6
     heads: 8
     attn_dropout: 0.1
-    ff_dropout: 0.1
+    ff_dropout: 0.2
     
   classifier:
     hidden_dim: 512
+    hidden_dim2: 256
     dropout: 0.5
     
   # Modality dropout for training robustness
@@ -35,11 +38,5 @@ model:
 
 fusion:
   _target_: "models.fusion.fusion.Fusion"
-  type: "early"  # [early, late, gated]
-    
-  output_dim: 256
-  dropout: 0.3
-  
-#  gating:
-#    enabled: false
-#    hidden_dim: 128
+  output_dim: 512
+  dropout: 0.2

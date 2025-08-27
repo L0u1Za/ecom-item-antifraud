@@ -55,3 +55,20 @@ class Fusion(nn.Module):
         output = self.output_proj(fused)
         
         return output
+
+class AttentionFusion(nn.Module):
+    def __init__(self, input_dim, output_dim, dropout: float = 0.3):
+        super().__init__()
+        self.attn = nn.Linear(input_dim, 1)
+        self.proj = nn.Linear(input_dim, output_dim)
+        self.norm = nn.LayerNorm(input_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, embeds):
+        # embeds: list of [B, D] tensors
+        x = torch.stack(embeds, dim=1)  # [B, M, D]
+        x = self.norm(x)
+        attn_weights = torch.softmax(self.attn(x).squeeze(-1), dim=1)  # [B, M]
+        fused = (x * attn_weights.unsqueeze(-1)).sum(dim=1)  # [B, D]
+        fused = self.dropout(fused)
+        return self.proj(fused)

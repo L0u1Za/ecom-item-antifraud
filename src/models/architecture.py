@@ -17,8 +17,10 @@ class TextTower(nn.Module):
         self.text_norm = nn.LayerNorm(cfg.model.text.projection_dim)
 
         self.dropout = nn.Dropout(cfg.model.text.dropout)
-        
-        self.freeze()
+        if cfg.model.text.get("unfreeze", False):
+            self.unfreeze()
+        else:
+            self.freeze()
         
     def forward(self, text_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         text_outputs = self.bert(**text_inputs)
@@ -48,7 +50,10 @@ class ImageTower(nn.Module):
         self.image_norm = nn.LayerNorm(cfg.model.image.projection_dim)
         self.dropout = nn.Dropout(cfg.model.image.dropout)
 
-        self.freeze()
+        if cfg.model.image.get("unfreeze", False):
+            self.unfreeze()
+        else:
+            self.freeze()
         
     def forward(self, image_inputs: torch.Tensor) -> torch.Tensor:
         """
@@ -116,10 +121,14 @@ class FraudDetectionModel(nn.Module):
 
         # Classifier
         self.classifier = nn.Sequential(
+            nn.LayerNorm(cfg.fusion.output_dim),
             nn.Linear(cfg.fusion.output_dim, cfg.model.classifier.hidden_dim),
             nn.ReLU(),
             nn.Dropout(cfg.model.classifier.dropout),
-            nn.Linear(cfg.model.classifier.hidden_dim, 1)
+            nn.Linear(cfg.model.classifier.hidden_dim, cfg.model.classifier.hidden_dim2),
+            nn.ReLU(),
+            nn.Dropout(cfg.model.classifier.dropout),
+            nn.Linear(cfg.model.classifier.hidden_dim2, 1)
         )
         
         # Modality dropout for training robustness
