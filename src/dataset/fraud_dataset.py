@@ -93,7 +93,7 @@ class InferenceDataset(Dataset):
 
         image_path = os.path.join(self.image_dir, f"{item_id}.png") if self.image_dir else None
 
-        processed = {'item_id': item[0]}
+        processed = {'item_id': item.iloc[0]}
 
         processed['text'] = self.text_processor(text_obj) if self.text_processor else None
     
