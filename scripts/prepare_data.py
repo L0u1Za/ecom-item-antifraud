@@ -167,9 +167,16 @@ def add_engineered_features(df_train, df_test):
 
     for df in [df_train, df_test]:
         df['anomaly_score'] = iso.predict(df[numeric_columns].fillna(0))
-    
+    # Save original indices
+    df_train['id'] = df_train.index
+    df_test['id'] = df_test.index
+
     df_train = df_train.merge(seller_stats, on='SellerID', how='left')
     df_test = df_test.merge(seller_stats, on='SellerID', how='left')
+    
+    # Restore original indices
+    df_train = df_train.set_index('id')
+    df_test = df_test.set_index('id')
     return df_train, df_test
 
 
