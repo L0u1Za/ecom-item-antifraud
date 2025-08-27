@@ -83,7 +83,7 @@ class InferenceDataset(Dataset):
         
     def __getitem__(self, idx) -> Dict[str, Any]:
         item = self.data.iloc[idx, ]
-        item_id = int(item['ItemID'])
+        item_id = int(item[0])
         
         text_obj = {'title': item['name_rus'], 'description': item['description'], 'brand_name': item['brand_name']}
         drop_cols = ['description', 'name_rus']
