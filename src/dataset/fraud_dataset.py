@@ -83,7 +83,7 @@ class InferenceDataset(Dataset):
         
     def __getitem__(self, idx) -> Dict[str, Any]:
         item = self.data.iloc[idx, ]
-        item_id = int(item[0])
+        item_id = int(item['ItemID'])
         
         text_obj = {'title': item['name_rus'], 'description': item['description'], 'brand_name': item['brand_name']}
         drop_cols = ['description', 'name_rus']
@@ -93,7 +93,7 @@ class InferenceDataset(Dataset):
 
         image_path = os.path.join(self.image_dir, f"{item_id}.png") if self.image_dir else None
 
-        processed = {'item_id': item['id']}
+        processed = {'item_id': item[0]}
 
         processed['text'] = self.text_processor(text_obj) if self.text_processor else None
     
