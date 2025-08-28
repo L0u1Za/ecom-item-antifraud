@@ -8,7 +8,7 @@ augmentations:
       _target_: torchvision.transforms.RandomResizedCrop
       size: 224
       scale: [0.8, 1.0]  # Less aggressive cropping for fraud detection
-    probability: 0.5
+    probability: 0.2
     
   - transform:
       _target_: torchvision.transforms.RandomHorizontalFlip
@@ -18,7 +18,7 @@ augmentations:
   - transform:
       _target_: torchvision.transforms.RandomRotation
       degrees: 10  # Small rotations to preserve text readability
-    probability: 0.3
+    probability: 0.2
     
   - transform:
       _target_: torchvision.transforms.ColorJitter
@@ -26,7 +26,7 @@ augmentations:
       contrast: 0.1
       saturation: 0.1
       hue: 0.05  # Smaller hue changes to preserve brand colors
-    probability: 0.3
+    probability: 0.1
   
 compute_clip_similarity: false
 clip_model: "openai/clip-vit-base-patch32"

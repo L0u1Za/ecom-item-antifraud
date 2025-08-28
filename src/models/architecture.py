@@ -12,11 +12,12 @@ class TextTower(nn.Module):
     def __init__(self, cfg: DictConfig):
         super().__init__()
         self.bert = AutoModel.from_pretrained(cfg.model.text.name)
-        self.text_proj = nn.Linear(self.bert.config.hidden_size, cfg.model.text.projection_dim)
-        # Layer normalization for each modality
-        self.text_norm = nn.LayerNorm(cfg.model.text.projection_dim)
-
-        self.dropout = nn.Dropout(cfg.model.text.dropout)
+        self.text_proj = nn.Sequential(
+            nn.Linear(self.bert.config.hidden_size, cfg.model.text.projection_dim),
+            nn.ReLU(),  # or nn.GELU()
+            nn.LayerNorm(cfg.model.text.projection_dim),
+            nn.Dropout(cfg.model.text.dropout)
+        )
         if cfg.model.text.get("unfreeze", False):
             self.unfreeze()
         else:
@@ -24,8 +25,7 @@ class TextTower(nn.Module):
         
     def forward(self, text_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         text_outputs = self.bert(**text_inputs)
-        text_norm = self.text_norm(self.text_proj(text_outputs.pooler_output))
-        text_emb = self.dropout(text_norm)
+        text_emb = self.text_proj(text_outputs.pooler_output)
         return text_emb
     
     def freeze(self):
@@ -46,9 +46,12 @@ class ImageTower(nn.Module):
             pretrained=cfg.model.image.pretrained,
             num_classes=0
         )
-        self.proj = nn.Linear(self.backbone.num_features, cfg.model.image.projection_dim)
-        self.image_norm = nn.LayerNorm(cfg.model.image.projection_dim)
-        self.dropout = nn.Dropout(cfg.model.image.dropout)
+        self.proj = nn.Sequential(
+            nn.Linear(self.backbone.num_features, cfg.model.image.projection_dim),
+            nn.ReLU(),  # or nn.GELU()
+            nn.LayerNorm(cfg.model.image.projection_dim),
+            nn.Dropout(cfg.model.image.dropout)
+        )
 
         if cfg.model.image.get("unfreeze", False):
             self.unfreeze()
@@ -63,9 +66,7 @@ class ImageTower(nn.Module):
             (B, proj_dim) tensor of image embeddings
         """
         features = self.backbone(image_inputs)
-        projected = self.proj(features)
-        normalized = self.image_norm(projected)
-        img_emb = self.dropout(normalized)
+        img_emb = self.proj(features)
         return img_emb
     
     def freeze(self):
@@ -100,12 +101,43 @@ class TabularTower(nn.Module):
         x_cont = tabular_inputs['continuous']    # [B, num_cont]
         return self.model(x_categ, x_cont)
 
+class DeepClassifier(nn.Module):
+    def __init__(self, input_dim, hidden_dim, hidden_dim2, dropout):
+        super().__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim2)
+        self.fc3 = nn.Linear(hidden_dim2, 1)
+        self.norm1 = nn.LayerNorm(hidden_dim)
+        self.norm2 = nn.LayerNorm(hidden_dim2)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        h1 = self.dropout(F.relu(self.norm1(self.fc1(x))))
+        h2 = self.dropout(F.relu(self.norm2(self.fc2(h1))))
+        out = self.fc3(h2 + h1)  # skip connection
+        return out
+
+class Classifier(nn.Module):
+    def __init__(self, input_dim, hidden_dim, hidden_dim2, dropout):
+        super().__init__()
+        self.classifier = nn.Sequential(
+            nn.LayerNorm(input_dim),
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim2, 1)
+        )
+    def forward(self, x):
+        return self.classifier(x)
+
 class FraudDetectionModel(nn.Module):
     def __init__(self, cfg: DictConfig, training=True):
         super().__init__()
-        
+
         fusion_emb_size = 0
-        
         if cfg.model.text.enabled:
             self.text_tower = TextTower(cfg)
             fusion_emb_size += cfg.model.text.projection_dim
@@ -115,21 +147,15 @@ class FraudDetectionModel(nn.Module):
         if cfg.model.tabular.enabled:
             self.tabular_tower = TabularTower(cfg)
             fusion_emb_size += cfg.model.tabular.projection_dim
-        
-        # Load fusion module using Hydra
-        self.fusion = hydra.utils.instantiate(cfg.fusion, input_dim=fusion_emb_size)
+
+        if cfg.fusion.get('input_dim', None) is None:
+            # Load fusion module using Hydra
+            self.fusion = hydra.utils.instantiate(cfg.fusion, input_dim=fusion_emb_size)
+        else:
+            self.fusion = hydra.utils.instantiate(cfg.fusion)
 
         # Classifier
-        self.classifier = nn.Sequential(
-            nn.LayerNorm(cfg.fusion.output_dim),
-            nn.Linear(cfg.fusion.output_dim, cfg.model.classifier.hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(cfg.model.classifier.dropout),
-            nn.Linear(cfg.model.classifier.hidden_dim, cfg.model.classifier.hidden_dim2),
-            nn.ReLU(),
-            nn.Dropout(cfg.model.classifier.dropout),
-            nn.Linear(cfg.model.classifier.hidden_dim2, 1)
-        )
+        self.classifier = hydra.utils.instantiate(cfg.model.classifier, input_dim=cfg.fusion.output_dim)
         
         # Modality dropout for training robustness
         self.modality_dropout = cfg.model.get('modality_dropout', 0.0)

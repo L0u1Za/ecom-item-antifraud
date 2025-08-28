@@ -64,7 +64,7 @@ class AttentionFusion(nn.Module):
         self.norm = nn.LayerNorm(input_dim)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, embeds):
+    def forward(self, embeds: List[torch.Tensor]):
         # embeds: list of [B, D] tensors
         x = torch.stack(embeds, dim=1)  # [B, M, D]
         x = self.norm(x)

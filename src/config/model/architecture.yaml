@@ -8,7 +8,7 @@ model:
     dropout: 0.2
     
   image:
-    enabled: true
+    enabled: false
     unfreeze: false
     name: "efficientnet_b0"
     pretrained: true
@@ -20,23 +20,25 @@ model:
     # FTTransformer hyperparameters
     categories: []         # to be filled at runtime from TabularProcessor.fit()
     num_continuous: 0      # to be filled at runtime from TabularProcessor.fit()
-    dim: 32
-    projection_dim: 128    # FTTransformer dim_out
+    dim: 64
+    projection_dim: 256    # FTTransformer dim_out
     depth: 6
     heads: 8
     attn_dropout: 0.1
     ff_dropout: 0.2
     
   classifier:
+    _target_: "models.architecture.DeepClassifier"
     hidden_dim: 512
-    hidden_dim2: 256
-    dropout: 0.5
+    hidden_dim2: 512
+    dropout: 0.3
     
   # Modality dropout for training robustness
   modality_dropout: 0.1  # Dropout rate for train (0.0 = no dropout)
   cache_dir: "cache"
 
 fusion:
-  _target_: "models.fusion.fusion.Fusion"
-  output_dim: 512
+  _target_: "models.fusion.fusion.AttentionFusion"
+  input_dim: 256
+  output_dim: 256
   dropout: 0.2

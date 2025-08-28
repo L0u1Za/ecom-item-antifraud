@@ -42,7 +42,6 @@ numerical_cols:
   - ItemVarietyCount
   - ItemAvailableCount
   - seller_time_alive_x
-  - ItemID
   - return_rate_30
   - fake_return_rate_30
   - refund_value_ratio_30
