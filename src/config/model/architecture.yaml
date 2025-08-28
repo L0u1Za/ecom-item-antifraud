@@ -1,7 +1,7 @@
 model:
   text:
     enabled: true
-    unfreeze: false
+    unfreeze: true
     name: "cointegrated/rubert-tiny2"
     pretrained: true
     projection_dim: 256
