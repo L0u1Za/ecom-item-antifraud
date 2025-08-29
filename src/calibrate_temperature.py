@@ -142,6 +142,10 @@ class TemperatureCalibrator:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
         
         def plot_reliability(ax, y_true, y_prob, title):
+            # Ensure arrays are flattened
+            y_true = np.array(y_true).flatten()
+            y_prob = np.array(y_prob).flatten()
+            
             n_bins = self.config.calibration.evaluation.n_bins
             bin_boundaries = np.linspace(0, 1, n_bins + 1)
             bin_lowers = bin_boundaries[:-1]
