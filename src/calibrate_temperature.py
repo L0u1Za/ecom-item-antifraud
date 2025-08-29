@@ -73,7 +73,7 @@ class TemperatureCalibrator:
         max_iter = self.config.calibration.optimization.max_iter
         lr = self.config.calibration.optimization.lr
         
-        self.temperature = nn.Parameter(torch.ones(1) * 1.5)
+        self.temperature = nn.Parameter(torch.ones(1, device=self.device) * 1.5)
         optimizer = optim.LBFGS([self.temperature], lr=lr, max_iter=max_iter)
         
         logits = logits.to(self.device)
