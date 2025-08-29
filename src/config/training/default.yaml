@@ -5,7 +5,7 @@ batch_size: 64
 
 criterion:
   _target_: "torch.nn.BCEWithLogitsLoss"
-  pos_weight: 15
+  pos_weight: 5
 
 optimizer:
   _target_: "torch.optim.Adam"
