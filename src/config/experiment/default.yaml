@@ -15,7 +15,7 @@ data:
   num_workers: 4
   
 checkpointing:
-  dir: "checkpoints"
+  dir: "data/checkpoints"
   save_best: true
   save_last: true
   save_frequency: 10  # Save every N epochs

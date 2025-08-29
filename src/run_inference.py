@@ -2,6 +2,8 @@ import hydra
 import pandas as pd
 import torch
 import pickle
+import json
+import os
 from omegaconf import DictConfig
 from hydra.utils import to_absolute_path
 from torch.utils.data import DataLoader
@@ -12,6 +14,25 @@ from dataset.collator import MultiModalCollatorTest
 from dataset.processor import TextProcessor, ImageProcessor, TabularProcessor
 from inference.predictor import Predictor
 
+def load_optimal_threshold(cfg):
+    """Load optimal threshold from file or use config default"""
+    threshold_path = to_absolute_path(cfg.threshold.optimal_threshold_path)
+    
+    if os.path.exists(threshold_path):
+        try:
+            with open(threshold_path, 'r') as f:
+                threshold_data = json.load(f)
+            threshold = threshold_data['threshold']
+            print(f"Loaded optimal threshold: {threshold:.4f} (F1: {threshold_data['f1_score']:.4f}) from {threshold_path}")
+            return threshold
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error loading threshold file {threshold_path}: {e}")
+            print(f"Using config default threshold: {cfg.inference.threshold}")
+            return cfg.inference.threshold
+    else:
+        print(f"No threshold file found at {threshold_path}")
+        print(f"Using config default threshold: {cfg.inference.threshold}")
+        return cfg.inference.threshold
 
 @hydra.main(config_path="./config", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -54,13 +75,16 @@ def main(cfg: DictConfig) -> None:
         pin_memory=True,
     )
 
-    # 3. Initialize predictor
+    # 3. Load optimal threshold
+    optimal_threshold = load_optimal_threshold(cfg)
+
+    # 4. Initialize predictor
     # Note: You need to provide a path to your trained model checkpoint.
     # This can be done via config override: +inference.model_path="path/to/your/model.pth"
     print("Initializing predictor...")
-    predictor = Predictor(cfg=cfg.model, model_path=to_absolute_path(cfg.inference.model_path), threshold=cfg.inference.threshold, device=device)
+    predictor = Predictor(cfg=cfg.model, model_path=to_absolute_path(cfg.inference.model_path), threshold=optimal_threshold, device=device)
 
-    # 4. Get predictions
+    # 5. Get predictions
     print("Generating predictions...")
     predictions = []
     item_ids = []
@@ -71,7 +95,7 @@ def main(cfg: DictConfig) -> None:
             predictions.extend(batch_preds)
             item_ids.extend(batch["item_id"]) # item_id is now a list/numpy array, not a tensor
 
-    # 5. Create submission file
+    # 6. Create submission file
     submission_df = pd.DataFrame({
         'id': item_ids,
         'prediction': predictions

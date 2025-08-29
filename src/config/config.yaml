@@ -5,6 +5,7 @@ defaults:
   - model: architecture
   - training: default
   - experiment: default
+  - calibration: default
   - _self_
 
 project:
@@ -22,7 +23,10 @@ processors:
   tabular_processor_path: "data/tabular_processor.pkl"
 
 inference:
-  model_path: "data/baseline_best.pt"
+  model_path: "${calibration.output_dir}/temperature_scaled_model.pt"
   output_path: "data/submission.csv"
   threshold: 0.5
   pr_curve_path: "data/pr_curve.png"
+
+threshold:
+  optimal_threshold_path: "data/optimal_threshold.json"

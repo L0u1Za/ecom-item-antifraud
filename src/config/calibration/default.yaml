@@ -1,0 +1,29 @@
+# Temperature Scaling Calibration Configuration
+
+# Model
+model_path: "data/baseline_last.pt"
+
+# Output settings
+output_dir: "data/calibrated_models"
+
+# Device configuration
+device: "auto"  # auto, cpu, cuda
+
+# Temperature optimization parameters
+optimization:
+  max_iter: 50
+  lr: 0.01
+
+# Calibration evaluation
+evaluation:
+  n_bins: 10  # Number of bins for ECE calculation
+  
+# Plotting settings
+plotting:
+  dpi: 300
+  figsize: [12, 5]
+  
+# Logging
+logging:
+  level: "INFO"
+  save_metrics: true

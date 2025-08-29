@@ -19,11 +19,5 @@ scheduler:
   factor: 0.5
   patience: 3
 
-#early_stopping:
-#  patience: 10
-#  monitor: "val_f1"
-#  mode: "max"
-  
 validation:
-  # frequency: 1
   threshold: 0.5

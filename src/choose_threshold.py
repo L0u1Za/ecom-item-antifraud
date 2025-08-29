@@ -2,6 +2,7 @@ import hydra
 import pandas as pd
 import torch
 import pickle
+import json
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig
 from hydra.utils import to_absolute_path
@@ -98,7 +99,20 @@ def main(cfg: DictConfig) -> None:
     print(f"\nBest F1 Score: {best_f1_score:.4f}")
     print(f"Best Threshold: {best_threshold:.4f}")
 
-    # 6. Plot and save the PR curve
+    # 6. Save optimal threshold
+    threshold_data = {
+        "threshold": float(best_threshold),
+        "f1_score": float(best_f1_score),
+        "precision": float(precision[best_f1_idx]),
+        "recall": float(recall[best_f1_idx])
+    }
+    
+    threshold_path = to_absolute_path(cfg.threshold.optimal_threshold_path)
+    with open(threshold_path, 'w') as f:
+        json.dump(threshold_data, f, indent=2)
+    print(f"Saved optimal threshold to {threshold_path}")
+
+    # 7. Plot and save the PR curve
     print("Plotting PR curve...")
     plt.figure(figsize=(8, 6))
     plt.plot(recall, precision, marker='.', label='PR Curve')
