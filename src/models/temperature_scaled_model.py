@@ -31,6 +31,10 @@ def expected_calibration_error(y_true, y_prob, n_bins=10):
     Returns:
         ECE score
     """
+    # Ensure arrays are flattened and numpy arrays
+    y_true = np.array(y_true).flatten()
+    y_prob = np.array(y_prob).flatten()
+    
     bin_boundaries = np.linspace(0, 1, n_bins + 1)
     bin_lowers = bin_boundaries[:-1]
     bin_uppers = bin_boundaries[1:]
