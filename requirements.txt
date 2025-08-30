@@ -19,4 +19,3 @@ imagehash
 hydra-core
 bs4
 nltk
-torch-focal
