@@ -1,5 +1,24 @@
 # @package preprocessing.image
 
+fast_mode: false  # Enable ultra-fast processing
+enable_clip: true  # Disable CLIP for speed
+enable_resnet: true  # Disable ResNet for speed
+compute_clip_similarity: true  # Skip text-image similarity
+
+# Only extract lightweight features
+extract_quality_features: true  # Basic image properties (fast)
+extract_hashes: true  # Perceptual hashes (fast)
+extract_embeddings: true  # Skip heavy embeddings
+
+# Batch processing settings
+batch_size: 256  # Large batches for speed
+num_workers: 4  # Parallel processing
+
+# Skip expensive computations
+skip_consistency_features: false
+skip_duplicate_detection: false  # Keep this for fraud detection
+skip_cross_seller_analysis: false
+
 size: [224, 224]
 mean: [0.485, 0.456, 0.406]
 std: [0.229, 0.224, 0.225]
@@ -48,6 +67,3 @@ augmentations:
       saturation: 0.1
       hue: 0.05  # Smaller hue changes to preserve brand colors
     probability: 0.1
-  
-compute_clip_similarity: false
-clip_model: "openai/clip-vit-base-patch32"

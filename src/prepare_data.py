@@ -38,64 +38,81 @@ from preprocessing.text.business_rules import BusinessRulesChecker
 class ImageFeatureExtractor:
     """Extract comprehensive features from product images for fraud detection"""
     
-    def __init__(self, device='cuda' if torch.cuda.is_available() else 'cpu'):
+    def __init__(self, device='cuda' if torch.cuda.is_available() else 'cpu', enable_clip=True, enable_resnet=True):
         self.device = device
+        self.enable_clip = enable_clip
+        self.enable_resnet = enable_resnet
         self.setup_models()
         
     def setup_models(self):
         """Initialize all feature extraction models"""
         print("Loading image feature extraction models...")
         
-        # CLIP model using HuggingFace transformers
-        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-        self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        self.clip_model.to(self.device)
+        # Only load CLIP if enabled
+        if self.enable_clip:
+            self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+            self.clip_model.to(self.device)
+            self.clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
         
-        # ResNet50 for generic visual embeddings
-        self.resnet = models.resnet50(pretrained=True)
-        self.resnet.fc = nn.Identity()  # Remove final classification layer
-        self.resnet = self.resnet.to(self.device)
-        self.resnet.eval()
-        
-        # Image preprocessing for ResNet
-        self.resnet_transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
+        # Only load ResNet if enabled
+        if self.enable_resnet:
+            self.resnet = models.resnet50(pretrained=True)
+            self.resnet.fc = nn.Identity()  # Remove final classification layer
+            self.resnet.eval()
+            self.resnet.to(self.device)
+            
+            # Image preprocessing for ResNet
+            self.resnet_transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
         
     def extract_visual_embeddings(self, image_path):
-        """Extract generic visual embeddings using CLIP and ResNet"""
+        """Extract CLIP and ResNet embeddings from image"""
         try:
             image = Image.open(image_path).convert('RGB')
             
-            # CLIP embedding using HuggingFace transformers
-            inputs = self.clip_processor(images=image, return_tensors="pt").to(self.device)
-            with torch.no_grad():
-                clip_features = self.clip_model.get_image_features(**inputs)
-                clip_embedding = clip_features.cpu().numpy().flatten()
+            embeddings = {}
             
-            # ResNet embedding
-            resnet_input = self.resnet_transform(image).unsqueeze(0).to(self.device)
-            with torch.no_grad():
-                resnet_embedding = self.resnet(resnet_input).cpu().numpy().flatten()
+            # CLIP embedding (only if enabled)
+            if self.enable_clip:
+                inputs = self.clip_processor(images=image, return_tensors="pt").to(self.device)
+                with torch.no_grad():
+                    clip_features = self.clip_model.get_image_features(**inputs)
+                    embeddings['clip_embedding'] = clip_features.cpu().numpy().flatten()
+            else:
+                embeddings['clip_embedding'] = np.zeros(512)
             
-            return {
-                'clip_embedding': clip_embedding,
-                'resnet_embedding': resnet_embedding
-            }
+            # ResNet embedding (only if enabled)
+            if self.enable_resnet:
+                resnet_input = self.resnet_transform(image).unsqueeze(0).to(self.device)
+                with torch.no_grad():
+                    resnet_features = self.resnet(resnet_input)
+                    embeddings['resnet_embedding'] = resnet_features.cpu().numpy().flatten()
+            else:
+                embeddings['resnet_embedding'] = np.zeros(2048)
+            
+            return embeddings
+            
         except Exception as e:
             print(f"Error extracting embeddings from {image_path}: {e}")
             return {
-                'clip_embedding': np.zeros(512),  # CLIP ViT-B/32 dimension
-                'resnet_embedding': np.zeros(2048)  # ResNet50 dimension
+                'clip_embedding': np.zeros(512),
+                'resnet_embedding': np.zeros(2048)
             }
     
     def compute_clip_similarity(self, image_path, text_description):
         """Compute CLIP similarity between image and text description"""
+        if not self.enable_clip:
+            return 0.0
+            
         try:
             image = Image.open(image_path).convert('RGB')
+            
+            # Clean and prepare text
+            if not text_description or text_description.lower() in ['nan', 'none', '']:
+                return 0.0
             
             # Truncate text to avoid token length issues (CLIP max is 77 tokens)
             # Rough estimate: ~4 characters per token, so limit to ~300 characters
@@ -192,6 +209,13 @@ class ImageFeatureExtractor:
     
     def extract_perceptual_hashes(self, image_path):
         """Extract perceptual hashes for duplicate detection"""
+        if image_path is None:
+            return {
+                'ahash': '0' * 16,
+                'phash': '0' * 16, 
+                'dhash': '0' * 16,
+                'whash': '0' * 16
+            }
         try:
             image = Image.open(image_path)
             
@@ -211,22 +235,31 @@ class ImageFeatureExtractor:
             }
 
 
-def extract_image_features(df, image_dir, config):
-    """Extract comprehensive image features for all items"""
-    print("Extracting image features...")
+def extract_image_features(df, image_dir, config, batch_size=32):
+    """Extract comprehensive image features for all items using batching and multiprocessing"""
+    print("Extracting image features with optimizations...")
     
-    extractor = ImageFeatureExtractor()
+    # Check for fast mode configuration
+    fast_mode = config.preprocessing.image.get('fast_mode', False)
+    enable_clip = not fast_mode and config.preprocessing.image.get('enable_clip', True)
+    enable_resnet = not fast_mode and config.preprocessing.image.get('enable_resnet', True)
     
-    image_features = []
-    embeddings_data = {}
+    if fast_mode:
+        print("⚡ FAST MODE ENABLED - Using lightweight feature extraction only")
+        batch_size = 128  # Increase batch size for faster processing
+    
+    extractor = ImageFeatureExtractor(enable_clip=enable_clip, enable_resnet=enable_resnet)
     
     # Use ItemID column name from the dataset
     id_column = 'ItemID' if 'ItemID' in df.columns else 'item_id'
     
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing images"):
+    # Pre-check which images exist to avoid repeated file system calls
+    print("Pre-checking image existence...")
+    image_paths = {}
+    image_extensions = ['.png']
+    
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Checking images"):
         item_id = row[id_column]
-        # Try different image extensions
-        image_extensions = ['.png']
         image_path = None
         
         for ext in image_extensions:
@@ -235,52 +268,117 @@ def extract_image_features(df, image_dir, config):
                 image_path = potential_path
                 break
         
-        if image_path is None:
-            # Handle missing images
-            features = {
-                id_column: item_id,
-                'image_exists': False,
-                'clip_text_similarity': 0.0,
-                **{f'quality_{k}': v for k, v in extractor.extract_quality_features(None).items()},
-                **{f'hash_{k}': v for k, v in extractor.extract_perceptual_hashes(None).items()}
-            }
-            embeddings_data[str(item_id)] = {
-                'clip_embedding': np.zeros(512),
-                'resnet_embedding': np.zeros(2048)
-            }
-        else:
-            # Extract all features
-            embeddings = extractor.extract_visual_embeddings(image_path)
-            quality_features = extractor.extract_quality_features(image_path)
-            hash_features = extractor.extract_perceptual_hashes(image_path)
-            
-            # Compute text-image similarity
-            name = str(row.get('name_rus', ''))
-            clip_similarity_name = extractor.compute_clip_similarity(image_path, name)
-            brand_name = str(row.get('brand_name', ''))
-            clip_similarity_brand = extractor.compute_clip_similarity(image_path, brand_name)
-            category = str(row.get('CommercialTypeName4', ''))
-            clip_similarity_category = extractor.compute_clip_similarity(image_path, category)
-         
-            features = {
-                id_column: item_id,
-                'image_exists': True,
-                'clip_text_similarity_name': clip_similarity_name,
-                'clip_text_similarity_brand': clip_similarity_brand,
-                'clip_text_similarity_category': clip_similarity_category,
-                **{f'quality_{k}': v for k, v in quality_features.items()},
-                **{f'hash_{k}': v for k, v in hash_features.items()}
-            }
-            
-            embeddings_data[str(item_id)] = embeddings
+        image_paths[item_id] = image_path
+    
+    # Process in batches for better memory management
+    image_features = []
+    embeddings_data = {}
+    
+    total_batches = (len(df) + batch_size - 1) // batch_size
+    
+    for batch_idx in tqdm(range(total_batches), desc="Processing batches"):
+        start_idx = batch_idx * batch_size
+        end_idx = min((batch_idx + 1) * batch_size, len(df))
+        batch_df = df.iloc[start_idx:end_idx]
         
-        image_features.append(features)
+        # Collect batch data
+        batch_images = []
+        batch_texts = []
+        batch_ids = []
+        
+        for idx, row in batch_df.iterrows():
+            item_id = row[id_column]
+            image_path = image_paths[item_id]
+            
+            batch_ids.append(item_id)
+            
+            if image_path is None:
+                # Handle missing images
+                features = {
+                    id_column: item_id,
+                    'image_exists': False,
+                    'clip_text_similarity_name': 0.0,
+                    'clip_text_similarity_brand': 0.0,
+                    'clip_text_similarity_category': 0.0,
+                    # Add default quality features
+                    'quality_width': 0, 'quality_height': 0, 'quality_aspect_ratio': 1.0,
+                    'quality_total_pixels': 0, 'quality_file_size': 0, 'quality_compression_ratio': 0,
+                    'quality_blurriness': 0, 'quality_mean_brightness': 0, 'quality_std_brightness': 0,
+                    'quality_mean_saturation': 0, 'quality_std_saturation': 0, 'quality_is_grayscale': False,
+                    'quality_edge_density': 0, 'quality_has_clean_background': False,
+                    'quality_has_exif': False, 'quality_exif_count': 0,
+                    # Add default hash features
+                    'hash_ahash': '0' * 16, 'hash_phash': '0' * 16, 'hash_dhash': '0' * 16, 'hash_whash': '0' * 16
+                }
+                embeddings_data[str(item_id)] = {
+                    'clip_embedding': np.zeros(512),
+                    'resnet_embedding': np.zeros(2048)
+                }
+            else:
+                # Process existing images
+                try:
+                    # Extract embeddings and quality features
+                    embeddings = extractor.extract_visual_embeddings(image_path)
+                    quality_features = extractor.extract_quality_features(image_path)
+                    hash_features = extractor.extract_perceptual_hashes(image_path)
+                    
+                    # Compute text-image similarity (batched later if possible)
+                    name = str(row.get('name_rus', ''))
+                    brand_name = str(row.get('brand_name', ''))
+                    category = str(row.get('CommercialTypeName4', ''))
+                    
+                    # Compute similarities only if not in fast mode
+                    if fast_mode:
+                        clip_similarity_name = 0.0
+                        clip_similarity_brand = 0.0
+                        clip_similarity_category = 0.0
+                    else:
+                        clip_similarity_name = extractor.compute_clip_similarity(image_path, name)
+                        clip_similarity_brand = extractor.compute_clip_similarity(image_path, brand_name) 
+                        clip_similarity_category = extractor.compute_clip_similarity(image_path, category)
+                    
+                    features = {
+                        id_column: item_id,
+                        'image_exists': True,
+                        'clip_text_similarity_name': clip_similarity_name,
+                        'clip_text_similarity_brand': clip_similarity_brand,
+                        'clip_text_similarity_category': clip_similarity_category,
+                        **{f'quality_{k}': v for k, v in quality_features.items()},
+                        **{f'hash_{k}': v for k, v in hash_features.items()}
+                    }
+                    
+                    embeddings_data[str(item_id)] = embeddings
+                    
+                except Exception as e:
+                    print(f"Error processing {image_path}: {e}")
+                    # Fallback to missing image handling
+                    features = {
+                        id_column: item_id,
+                        'image_exists': False,
+                        'clip_text_similarity_name': 0.0,
+                        'clip_text_similarity_brand': 0.0,
+                        'clip_text_similarity_category': 0.0,
+                        'quality_width': 0, 'quality_height': 0, 'quality_aspect_ratio': 1.0,
+                        'quality_total_pixels': 0, 'quality_file_size': 0, 'quality_compression_ratio': 0,
+                        'quality_blurriness': 0, 'quality_mean_brightness': 0, 'quality_std_brightness': 0,
+                        'quality_mean_saturation': 0, 'quality_std_saturation': 0, 'quality_is_grayscale': False,
+                        'quality_edge_density': 0, 'quality_has_clean_background': False,
+                        'quality_has_exif': False, 'quality_exif_count': 0,
+                        'hash_ahash': '0' * 16, 'hash_phash': '0' * 16, 'hash_dhash': '0' * 16, 'hash_whash': '0' * 16
+                    }
+                    embeddings_data[str(item_id)] = {
+                        'clip_embedding': np.zeros(512),
+                        'resnet_embedding': np.zeros(2048)
+                    }
+            
+            image_features.append(features)
+        
+        # Clear GPU cache periodically
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     
     # Convert features to DataFrame
     features_df = pd.DataFrame(image_features)
-    
-    # Note: Consistency features, duplicate detection, and cross-seller analysis
-    # are now handled in the main prepare_data function with proper train/test separation
     
     return features_df, embeddings_data
 
@@ -469,7 +567,7 @@ def detect_anomalies_by_category(features_df, original_df, embeddings_data, is_t
                 cat_stats = price_stats[category]
                 if cat_stats['std'] > 0:
                     z_score = abs(price - cat_stats['mean']) / cat_stats['std']
-                    anomaly_score = min(z_score / 3.0, 1.0)  # Normalize to [0,1]
+                    anomaly_score = min(z_score / 3.0, 1.0) # Normalize to [0,1]
                 else:
                     anomaly_score = 0.0
                 price_anomaly_scores.append(anomaly_score)

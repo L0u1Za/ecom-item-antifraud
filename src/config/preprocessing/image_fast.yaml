@@ -1,0 +1,22 @@
+# Fast image processing configuration for quick data preparation
+# This configuration prioritizes speed over feature completeness
+
+extract_features: true
+fast_mode: true  # Enable ultra-fast processing
+enable_clip: false  # Disable CLIP for speed
+enable_resnet: false  # Disable ResNet for speed
+compute_clip_similarity: false  # Skip text-image similarity
+
+# Only extract lightweight features
+extract_quality_features: true  # Basic image properties (fast)
+extract_hashes: true  # Perceptual hashes (fast)
+extract_embeddings: false  # Skip heavy embeddings
+
+# Batch processing settings
+batch_size: 256  # Large batches for speed
+num_workers: 4  # Parallel processing
+
+# Skip expensive computations
+skip_consistency_features: true
+skip_duplicate_detection: false  # Keep this for fraud detection
+skip_cross_seller_analysis: true
