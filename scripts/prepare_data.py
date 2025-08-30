@@ -847,10 +847,6 @@ def add_engineered_features(df_train, df_test):
     
     # --- Apply seller statistics ---
     print("Applying seller statistics...")
-    
-    # Save original indices
-    df_train['id'] = df_train.index
-    df_test['id'] = df_test.index
 
     # Merge different seller stats to each dataset
     df_train = df_train.merge(seller_stats_train, on='SellerID', how='left')
@@ -872,10 +868,6 @@ def add_engineered_features(df_train, df_test):
     # Apply to both datasets
     df_train['anomaly_score'] = iso.predict(df_train[numeric_columns].fillna(0))
     df_test['anomaly_score'] = iso.predict(df_test[numeric_columns].fillna(0))
-    
-    # Restore original indices
-    df_train = df_train.set_index('id')
-    df_test = df_test.set_index('id')
     
     return df_train, df_test
 
@@ -910,8 +902,15 @@ def prepare_data(config, train_path=None, test_path=None, output_dir=None):
     df_train = pd.read_csv(train_path, index_col=0)
     df_test = pd.read_csv(test_path, index_col=0)
     
+    # Store original source IDs
+    print("Preserving original source IDs...")
+    df_train['id'] = df_train.index
+    df_test['id'] = df_test.index
+    
     print(f"Train shape: {df_train.shape}")
     print(f"Test shape: {df_test.shape}")
+    print(f"Train source IDs range: {df_train['id'].min()} to {df_train['id'].max()}")
+    print(f"Test source IDs range: {df_test['id'].min()} to {df_test['id'].max()}")
     print(f"Target distribution in train:")
     print(df_train['resolution'].value_counts())
     
@@ -919,7 +918,7 @@ def prepare_data(config, train_path=None, test_path=None, output_dir=None):
     # Fill nulls
     cat_cols = ['brand_name', 'CommercialTypeName4']
     numeric_columns = df_train.select_dtypes(include=[np.number]).columns.tolist()
-    numeric_columns = [col for col in numeric_columns if col != 'resolution']
+    numeric_columns = [col for col in numeric_columns if col not in ['resolution', 'id']]
 
     df_train[numeric_columns] = df_train[numeric_columns].fillna(0)
     df_test[numeric_columns] = df_test[numeric_columns].fillna(0)
@@ -1038,6 +1037,10 @@ def prepare_data(config, train_path=None, test_path=None, output_dir=None):
     
     # Save prepared datasets
     print("Saving prepared datasets...")
+
+    # Restore original indices
+    df_train = df_train.set_index('id')
+    df_test = df_test.set_index('id')
     
     # Save full prepared datasets
     train_prepared_path = os.path.join(output_dir, 'train_prepared.csv')
@@ -1053,6 +1056,8 @@ def prepare_data(config, train_path=None, test_path=None, output_dir=None):
     print("Creating train/validation split...")
     df_train_clean = df_train.drop(columns=['SellerID'], errors='ignore')
     df_test_clean = df_test.drop(columns=['SellerID'], errors='ignore')
+    
+    print(f"Final datasets contain id column: Train={('id' in df_train_clean.columns)}, Test={('id' in df_test_clean.columns)}")
     
     df_train_train, df_train_val = train_test_split(
         df_train_clean, test_size=0.2, random_state=42, 
