@@ -68,13 +68,10 @@ class ImageFeatureExtractor:
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
         
-    def extract_visual_embeddings(self, image_path):
-        """Extract CLIP and ResNet embeddings from image"""
+    def extract_visual_embeddings(self, image):
+        """Extract CLIP and ResNet embeddings from image (PIL.Image)"""
         try:
-            image = Image.open(image_path).convert('RGB')
-            
             embeddings = {}
-            
             # CLIP embedding (only if enabled)
             if self.enable_clip:
                 inputs = self.clip_processor(images=image, return_tensors="pt").to(self.device)
@@ -83,7 +80,6 @@ class ImageFeatureExtractor:
                     embeddings['clip_embedding'] = clip_features.cpu().numpy().flatten()
             else:
                 embeddings['clip_embedding'] = np.zeros(512)
-            
             # ResNet embedding (only if enabled)
             if self.enable_resnet:
                 resnet_input = self.resnet_transform(image).unsqueeze(0).to(self.device)
@@ -92,34 +88,23 @@ class ImageFeatureExtractor:
                     embeddings['resnet_embedding'] = resnet_features.cpu().numpy().flatten()
             else:
                 embeddings['resnet_embedding'] = np.zeros(2048)
-            
             return embeddings
-            
         except Exception as e:
-            print(f"Error extracting embeddings from {image_path}: {e}")
+            print(f"Error extracting embeddings: {e}")
             return {
                 'clip_embedding': np.zeros(512),
                 'resnet_embedding': np.zeros(2048)
             }
     
-    def compute_clip_similarity(self, image_path, text_description):
-        """Compute CLIP similarity between image and text description"""
+    def compute_clip_similarity(self, image, text_description):
+        """Compute CLIP similarity between image (PIL.Image) and text description"""
         if not self.enable_clip:
             return 0.0
-            
         try:
-            image = Image.open(image_path).convert('RGB')
-            
-            # Clean and prepare text
             if not text_description or text_description.lower() in ['nan', 'none', '']:
                 return 0.0
-            
-            # Truncate text to avoid token length issues (CLIP max is 77 tokens)
-            # Rough estimate: ~4 characters per token, so limit to ~300 characters
             if len(text_description) > 300:
                 text_description = text_description[:300]
-            
-            # Process image and text using HuggingFace CLIP
             inputs = self.clip_processor(
                 text=[text_description], 
                 images=image, 
@@ -128,77 +113,49 @@ class ImageFeatureExtractor:
                 truncation=True,
                 max_length=77
             ).to(self.device)
-            
             with torch.no_grad():
                 outputs = self.clip_model(**inputs)
-                # Get similarity score (logits per image)
                 similarity = outputs.logits_per_image[0, 0].item()
-            
             return similarity
         except Exception as e:
-            print(f"Error computing CLIP similarity for {image_path}: {e}")
+            print(f"Error computing CLIP similarity: {e}")
             return 0.0
     
-    def extract_quality_features(self, image_path):
-        """Extract image quality and manipulation detection features"""
+    def extract_quality_features(self, pil_image, cv_image):
+        """Extract image quality and manipulation detection features from PIL and OpenCV images"""
         try:
-            # Load image with PIL and OpenCV
-            pil_image = Image.open(image_path)
-            cv_image = cv2.imread(str(image_path))
-            
             features = {}
-            
-            # Basic image properties
             features['width'] = pil_image.width
             features['height'] = pil_image.height
             features['aspect_ratio'] = pil_image.width / pil_image.height
             features['total_pixels'] = pil_image.width * pil_image.height
-            
-            # File size
-            features['file_size'] = os.path.getsize(image_path)
-            features['compression_ratio'] = features['file_size'] / features['total_pixels']
-            
-            # Color analysis
+            # File size cannot be computed from image object, must be passed separately if needed
+            features['file_size'] = 0
+            features['compression_ratio'] = 0
             if cv_image is not None:
-                # Convert to different color spaces
                 gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
                 hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
-                
-                # Blurriness (Laplacian variance)
                 features['blurriness'] = cv2.Laplacian(gray, cv2.CV_64F).var()
-                
-                # Color distribution features
                 features['mean_brightness'] = np.mean(gray)
                 features['std_brightness'] = np.std(gray)
                 features['mean_saturation'] = np.mean(hsv[:,:,1])
                 features['std_saturation'] = np.std(hsv[:,:,1])
-                
-                # Check if image is mostly grayscale
                 b, g, r = cv2.split(cv_image)
                 features['is_grayscale'] = np.allclose(b, g, atol=10) and np.allclose(g, r, atol=10)
-                
-                # Background detection (simple edge-based approach)
                 edges = cv2.Canny(gray, 50, 150)
                 edge_density = np.sum(edges > 0) / edges.size
                 features['edge_density'] = edge_density
-                features['has_clean_background'] = edge_density < 0.1  # Low edge density suggests clean background
-            
-            # EXIF metadata analysis
+                features['has_clean_background'] = edge_density < 0.1
             try:
                 exif_dict = pil_image._getexif()
                 features['has_exif'] = exif_dict is not None and len(exif_dict) > 0
-                if features['has_exif']:
-                    features['exif_count'] = len(exif_dict)
-                else:
-                    features['exif_count'] = 0
+                features['exif_count'] = len(exif_dict) if features['has_exif'] else 0
             except:
                 features['has_exif'] = False
                 features['exif_count'] = 0
-            
             return features
-            
         except Exception as e:
-            print(f"Error extracting quality features from {image_path}: {e}")
+            print(f"Error extracting quality features: {e}")
             return {
                 'width': 0, 'height': 0, 'aspect_ratio': 1.0, 'total_pixels': 0,
                 'file_size': 0, 'compression_ratio': 0, 'blurriness': 0,
@@ -207,31 +164,160 @@ class ImageFeatureExtractor:
                 'has_clean_background': False, 'has_exif': False, 'exif_count': 0
             }
     
-    def extract_perceptual_hashes(self, image_path):
-        """Extract perceptual hashes for duplicate detection"""
-        if image_path is None:
-            return {
-                'ahash': '0' * 16,
-                'phash': '0' * 16, 
-                'dhash': '0' * 16,
-                'whash': '0' * 16
-            }
+    def extract_perceptual_hashes(self, pil_image):
+        """Extract perceptual hashes for duplicate detection from PIL.Image"""
         try:
-            image = Image.open(image_path)
-            
             return {
-                'ahash': str(imagehash.average_hash(image)),
-                'phash': str(imagehash.phash(image)),
-                'dhash': str(imagehash.dhash(image)),
-                'whash': str(imagehash.whash(image))
+                'ahash': str(imagehash.average_hash(pil_image)),
+                'phash': str(imagehash.phash(pil_image)),
+                'dhash': str(imagehash.dhash(pil_image)),
+                'whash': str(imagehash.whash(pil_image))
             }
         except Exception as e:
-            print(f"Error extracting hashes from {image_path}: {e}")
+            print(f"Error extracting hashes: {e}")
             return {
                 'ahash': '0' * 16,
                 'phash': '0' * 16, 
                 'dhash': '0' * 16,
                 'whash': '0' * 16
+            }
+    
+    def extract_all_features(self, image_path, text_name=None, text_brand=None, text_category=None, fast_mode=False):
+        """
+        Extract all features (embeddings, quality, hashes, similarities) from a single image,
+        opening the image only once and reusing it for all feature extractors.
+        """
+        if image_path is None:
+            # Return default features for missing image
+            return {
+                'embeddings': {
+                    'clip_embedding': np.zeros(512),
+                    'resnet_embedding': np.zeros(2048)
+                },
+                'quality': {
+                    'width': 0, 'height': 0, 'aspect_ratio': 1.0, 'total_pixels': 0,
+                    'file_size': 0, 'compression_ratio': 0, 'blurriness': 0,
+                    'mean_brightness': 0, 'std_brightness': 0, 'mean_saturation': 0,
+                    'std_saturation': 0, 'is_grayscale': False, 'edge_density': 0,
+                    'has_clean_background': False, 'has_exif': False, 'exif_count': 0
+                },
+                'hashes': {
+                    'ahash': '0' * 16,
+                    'phash': '0' * 16, 
+                    'dhash': '0' * 16,
+                    'whash': '0' * 16
+                },
+                'similarities': {
+                    'clip_text_similarity_name': 0.0,
+                    'clip_text_similarity_brand': 0.0,
+                    'clip_text_similarity_category': 0.0
+                }
+            }
+        try:
+            pil_image = Image.open(image_path).convert('RGB')
+            cv_image = cv2.imread(str(image_path))
+            # Embeddings
+            embeddings = {}
+            if self.enable_clip:
+                inputs = self.clip_processor(images=pil_image, return_tensors="pt").to(self.device)
+                with torch.no_grad():
+                    clip_features = self.clip_model.get_image_features(**inputs)
+                    embeddings['clip_embedding'] = clip_features.cpu().numpy().flatten()
+            else:
+                embeddings['clip_embedding'] = np.zeros(512)
+            if self.enable_resnet:
+                resnet_input = self.resnet_transform(pil_image).unsqueeze(0).to(self.device)
+                with torch.no_grad():
+                    resnet_features = self.resnet(resnet_input)
+                    embeddings['resnet_embedding'] = resnet_features.cpu().numpy().flatten()
+            else:
+                embeddings['resnet_embedding'] = np.zeros(2048)
+            # Quality
+            features = {}
+            features['width'] = pil_image.width
+            features['height'] = pil_image.height
+            features['aspect_ratio'] = pil_image.width / pil_image.height
+            features['total_pixels'] = pil_image.width * pil_image.height
+            features['file_size'] = os.path.getsize(image_path)
+            features['compression_ratio'] = features['file_size'] / features['total_pixels']
+            if cv_image is not None:
+                gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+                hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
+                features['blurriness'] = cv2.Laplacian(gray, cv2.CV_64F).var()
+                features['mean_brightness'] = np.mean(gray)
+                features['std_brightness'] = np.std(gray)
+                features['mean_saturation'] = np.mean(hsv[:,:,1])
+                features['std_saturation'] = np.std(hsv[:,:,1])
+                b, g, r = cv2.split(cv_image)
+                features['is_grayscale'] = np.allclose(b, g, atol=10) and np.allclose(g, r, atol=10)
+                edges = cv2.Canny(gray, 50, 150)
+                edge_density = np.sum(edges > 0) / edges.size
+                features['edge_density'] = edge_density
+                features['has_clean_background'] = edge_density < 0.1
+            try:
+                exif_dict = pil_image._getexif()
+                features['has_exif'] = exif_dict is not None and len(exif_dict) > 0
+                features['exif_count'] = len(exif_dict) if features['has_exif'] else 0
+            except:
+                features['has_exif'] = False
+                features['exif_count'] = 0
+            # Hashes
+            hashes = {
+                'ahash': str(imagehash.average_hash(pil_image)),
+                'phash': str(imagehash.phash(pil_image)),
+                'dhash': str(imagehash.dhash(pil_image)),
+                'whash': str(imagehash.whash(pil_image))
+            }
+            # Similarities
+            similarities = {
+                'clip_text_similarity_name': 0.0,
+                'clip_text_similarity_brand': 0.0,
+                'clip_text_similarity_category': 0.0
+            }
+            if not fast_mode and self.enable_clip:
+                for key, text in zip(['name', 'brand', 'category'], [text_name, text_brand, text_category]):
+                    if text and text.lower() not in ['nan', 'none', '']:
+                        # Truncate text for CLIP
+                        if len(text) > 300:
+                            text = text[:300]
+                        inputs = self.clip_processor(
+                            text=[text], images=pil_image, return_tensors="pt", padding=True, truncation=True, max_length=77
+                        ).to(self.device)
+                        with torch.no_grad():
+                            outputs = self.clip_model(**inputs)
+                            similarity = outputs.logits_per_image[0, 0].item()
+                        similarities[f'clip_text_similarity_{key}'] = similarity
+            return {
+                'embeddings': embeddings,
+                'quality': features,
+                'hashes': hashes,
+                'similarities': similarities
+            }
+        except Exception as e:
+            print(f"Error extracting all features from {image_path}: {e}")
+            return {
+                'embeddings': {
+                    'clip_embedding': np.zeros(512),
+                    'resnet_embedding': np.zeros(2048)
+                },
+                'quality': {
+                    'width': 0, 'height': 0, 'aspect_ratio': 1.0, 'total_pixels': 0,
+                    'file_size': 0, 'compression_ratio': 0, 'blurriness': 0,
+                    'mean_brightness': 0, 'std_brightness': 0, 'mean_saturation': 0,
+                    'std_saturation': 0, 'is_grayscale': False, 'edge_density': 0,
+                    'has_clean_background': False, 'has_exif': False, 'exif_count': 0
+                },
+                'hashes': {
+                    'ahash': '0' * 16,
+                    'phash': '0' * 16, 
+                    'dhash': '0' * 16,
+                    'whash': '0' * 16
+                },
+                'similarities': {
+                    'clip_text_similarity_name': 0.0,
+                    'clip_text_similarity_brand': 0.0,
+                    'clip_text_similarity_category': 0.0
+                }
             }
 
 
@@ -270,116 +356,93 @@ def extract_image_features(df, image_dir, config, batch_size=32):
         
         image_paths[item_id] = image_path
     
-    # Process in batches for better memory management
+    # Process images one by one (no batching)
     image_features = []
     embeddings_data = {}
-    
-    total_batches = (len(df) + batch_size - 1) // batch_size
-    
-    for batch_idx in tqdm(range(total_batches), desc="Processing batches"):
-        start_idx = batch_idx * batch_size
-        end_idx = min((batch_idx + 1) * batch_size, len(df))
-        batch_df = df.iloc[start_idx:end_idx]
-        
-        # Collect batch data
-        batch_images = []
-        batch_texts = []
-        batch_ids = []
-        
-        for idx, row in batch_df.iterrows():
-            item_id = row[id_column]
-            image_path = image_paths[item_id]
-            
-            batch_ids.append(item_id)
-            
-            if image_path is None:
-                # Handle missing images
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing images"):
+        item_id = row[id_column]
+        image_path = image_paths[item_id]
+        if image_path is None:
+            # Handle missing images
+            features = {
+                id_column: item_id,
+                'image_exists': False,
+                'clip_text_similarity_name': 0.0,
+                'clip_text_similarity_brand': 0.0,
+                'clip_text_similarity_category': 0.0,
+                # Add default quality features
+                'quality_width': 0, 'quality_height': 0, 'quality_aspect_ratio': 1.0,
+                'quality_total_pixels': 0, 'quality_file_size': 0, 'quality_compression_ratio': 0,
+                'quality_blurriness': 0, 'quality_mean_brightness': 0, 'quality_std_brightness': 0,
+                'quality_mean_saturation': 0, 'quality_std_saturation': 0, 'quality_is_grayscale': False,
+                'quality_edge_density': 0, 'quality_has_clean_background': False,
+                'quality_has_exif': False, 'quality_exif_count': 0,
+                # Add default hash features
+                'hash_ahash': '0' * 16, 'hash_phash': '0' * 16, 'hash_dhash': '0' * 16, 'hash_whash': '0' * 16
+            }
+            embeddings_data[str(item_id)] = {
+                'clip_embedding': np.zeros(512),
+                'resnet_embedding': np.zeros(2048)
+            }
+        else:
+            # Process existing images
+            try:
+                from PIL import Image
+                import cv2
+                pil_image = Image.open(image_path).convert('RGB')
+                cv_image = cv2.imread(str(image_path))
+                # Extract embeddings and quality features
+                embeddings = extractor.extract_visual_embeddings(pil_image)
+                quality_features = extractor.extract_quality_features(pil_image, cv_image)
+                hash_features = extractor.extract_perceptual_hashes(pil_image)
+                # Compute text-image similarity
+                name = str(row.get('name_rus', ''))
+                brand_name = str(row.get('brand_name', ''))
+                category = str(row.get('CommercialTypeName4', ''))
+                if fast_mode:
+                    clip_similarity_name = 0.0
+                    clip_similarity_brand = 0.0
+                    clip_similarity_category = 0.0
+                else:
+                    clip_similarity_name = extractor.compute_clip_similarity(pil_image, name)
+                    clip_similarity_brand = extractor.compute_clip_similarity(pil_image, brand_name)
+                    clip_similarity_category = extractor.compute_clip_similarity(pil_image, category)
+                features = {
+                    id_column: item_id,
+                    'image_exists': True,
+                    'clip_text_similarity_name': clip_similarity_name,
+                    'clip_text_similarity_brand': clip_similarity_brand,
+                    'clip_text_similarity_category': clip_similarity_category,
+                    **{f'quality_{k}': v for k, v in quality_features.items()},
+                    **{f'hash_{k}': v for k, v in hash_features.items()}
+                }
+                embeddings_data[str(item_id)] = embeddings
+            except Exception as e:
+                print(f"Error processing {image_path}: {e}")
+                # Fallback to missing image handling
                 features = {
                     id_column: item_id,
                     'image_exists': False,
                     'clip_text_similarity_name': 0.0,
                     'clip_text_similarity_brand': 0.0,
                     'clip_text_similarity_category': 0.0,
-                    # Add default quality features
                     'quality_width': 0, 'quality_height': 0, 'quality_aspect_ratio': 1.0,
                     'quality_total_pixels': 0, 'quality_file_size': 0, 'quality_compression_ratio': 0,
                     'quality_blurriness': 0, 'quality_mean_brightness': 0, 'quality_std_brightness': 0,
                     'quality_mean_saturation': 0, 'quality_std_saturation': 0, 'quality_is_grayscale': False,
                     'quality_edge_density': 0, 'quality_has_clean_background': False,
                     'quality_has_exif': False, 'quality_exif_count': 0,
-                    # Add default hash features
                     'hash_ahash': '0' * 16, 'hash_phash': '0' * 16, 'hash_dhash': '0' * 16, 'hash_whash': '0' * 16
                 }
                 embeddings_data[str(item_id)] = {
                     'clip_embedding': np.zeros(512),
                     'resnet_embedding': np.zeros(2048)
                 }
-            else:
-                # Process existing images
-                try:
-                    # Extract embeddings and quality features
-                    embeddings = extractor.extract_visual_embeddings(image_path)
-                    quality_features = extractor.extract_quality_features(image_path)
-                    hash_features = extractor.extract_perceptual_hashes(image_path)
-                    
-                    # Compute text-image similarity (batched later if possible)
-                    name = str(row.get('name_rus', ''))
-                    brand_name = str(row.get('brand_name', ''))
-                    category = str(row.get('CommercialTypeName4', ''))
-                    
-                    # Compute similarities only if not in fast mode
-                    if fast_mode:
-                        clip_similarity_name = 0.0
-                        clip_similarity_brand = 0.0
-                        clip_similarity_category = 0.0
-                    else:
-                        clip_similarity_name = extractor.compute_clip_similarity(image_path, name)
-                        clip_similarity_brand = extractor.compute_clip_similarity(image_path, brand_name) 
-                        clip_similarity_category = extractor.compute_clip_similarity(image_path, category)
-                    
-                    features = {
-                        id_column: item_id,
-                        'image_exists': True,
-                        'clip_text_similarity_name': clip_similarity_name,
-                        'clip_text_similarity_brand': clip_similarity_brand,
-                        'clip_text_similarity_category': clip_similarity_category,
-                        **{f'quality_{k}': v for k, v in quality_features.items()},
-                        **{f'hash_{k}': v for k, v in hash_features.items()}
-                    }
-                    
-                    embeddings_data[str(item_id)] = embeddings
-                    
-                except Exception as e:
-                    print(f"Error processing {image_path}: {e}")
-                    # Fallback to missing image handling
-                    features = {
-                        id_column: item_id,
-                        'image_exists': False,
-                        'clip_text_similarity_name': 0.0,
-                        'clip_text_similarity_brand': 0.0,
-                        'clip_text_similarity_category': 0.0,
-                        'quality_width': 0, 'quality_height': 0, 'quality_aspect_ratio': 1.0,
-                        'quality_total_pixels': 0, 'quality_file_size': 0, 'quality_compression_ratio': 0,
-                        'quality_blurriness': 0, 'quality_mean_brightness': 0, 'quality_std_brightness': 0,
-                        'quality_mean_saturation': 0, 'quality_std_saturation': 0, 'quality_is_grayscale': False,
-                        'quality_edge_density': 0, 'quality_has_clean_background': False,
-                        'quality_has_exif': False, 'quality_exif_count': 0,
-                        'hash_ahash': '0' * 16, 'hash_phash': '0' * 16, 'hash_dhash': '0' * 16, 'hash_whash': '0' * 16
-                    }
-                    embeddings_data[str(item_id)] = {
-                        'clip_embedding': np.zeros(512),
-                        'resnet_embedding': np.zeros(2048)
-                    }
-            
-            image_features.append(features)
-        
-        # Clear GPU cache periodically
-        if torch.cuda.is_available():
+        image_features.append(features)
+        # Optionally clear GPU cache periodically
+        if torch.cuda.is_available() and idx % 100 == 0:
             torch.cuda.empty_cache()
-    
-    # Convert features to DataFrame
     features_df = pd.DataFrame(image_features)
-    
     return features_df, embeddings_data
 
 
@@ -1158,7 +1221,7 @@ def prepare_data(config, train_path=None, test_path=None, output_dir=None):
     print(f"Final datasets contain id column: Train={('id' in df_train_clean.columns)}, Test={('id' in df_test_clean.columns)}")
     
     df_train_train, df_train_val = train_test_split(
-        df_train_clean, test_size=0.2, random_state=42, 
+        df_train_clean, test_size=0.2, random_state=42,
         stratify=df_train_clean['resolution']
     )
     
