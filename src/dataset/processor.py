@@ -6,6 +6,8 @@ from omegaconf import DictConfig
 import math
 import pandas as pd
 import os
+import pickle
+import numpy as np
 from PIL import Image
 
 from preprocessing.image.clip_validator import CLIPValidator
@@ -55,56 +57,112 @@ class TextProcessor:
         return obj
 
 class ImageProcessor:
-    def __init__(self, 
-                 config: DictConfig,
-                 training=True):
-        """
-        Args:
-            config: Configuration containing image preprocessing settings
-            compute_clip_similarity: Whether to compute CLIP similarity
-            clip_model: CLIP model instance if similarity is enabled
-        """
-        self.config = config
+    def __init__(self, cfg: DictConfig, training: bool = True):
+        self.cfg = cfg.preprocessing.image
         self.training = training
-        size = tuple(config.preprocessing.image.size)
+        self.use_precomputed = self.cfg.get('use_precomputed_features', False)
         
-        # Basic transform pipeline
-        self.transform = transforms.Compose([
-            transforms.Resize(size),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                              std=[0.229, 0.224, 0.225])
-        ])
+        if self.use_precomputed:
+            # Load precomputed features
+            self.precomputed_features = self._load_precomputed_features(self.cfg.precomputed_features_path)
+            self.feature_dim = self._get_feature_dimension()
+        else:
+            # Basic transforms for raw images
+            size = self.cfg.size
+            mean = self.cfg.mean
+            std = self.cfg.std
+            
+            self.transform = transforms.Compose([
+                transforms.Resize(size),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=mean, std=std)
+            ])
+            
+            # Setup augmentations if training
+            self.augmentations = []
+            if training and hasattr(self.cfg, 'augmentations'):
+                for aug_cfg in self.cfg.augmentations:
+                    transform = hydra.utils.instantiate(aug_cfg.transform)
+                    probability = aug_cfg.get('probability', 1.0)
+                    self.augmentations.append((transform, probability))
+            
+            # Setup CLIP validator if enabled
+            if self.cfg.get('compute_clip_similarity', False):
+                self.clip_validator = CLIPValidator(cfg.clip_model)
+    
+    def _load_precomputed_features(self, features_path: str) -> Dict:
+        """Load precomputed image features from pickle file"""
+        try:
+            with open(features_path, 'rb') as f:
+                features = pickle.load(f)
+            print(f"Loaded precomputed features for {len(features)} items")
+            return features
+        except Exception as e:
+            print(f"Warning: Could not load precomputed features from {features_path}: {e}")
+            return {}
+    
+    def _get_feature_dimension(self) -> int:
+        """Get the dimension of precomputed features"""
+        if not self.precomputed_features:
+            return 2600  # Default: CLIP (512) + ResNet (2048) + quality features (~40)
         
-        # Create augmentation pipeline from config
-        self.augmentations = []
-        if hasattr(config.preprocessing.image, 'augmentations'):
-            for aug_config in config.preprocessing.image.augmentations:
-                # Each augmentation should be fully defined in config
-                aug_transform = hydra.utils.instantiate(
-                    aug_config.transform,
-                    _convert_="partial"
-                )
-                self.augmentations.append((
-                    aug_transform,
-                    aug_config.probability
-                ))
-
-        if config.preprocessing.image.compute_clip_similarity:
-            self.clip_validator = CLIPValidator(config.preprocessing.image.clip_model, self.transform)
-
-    def get_empty_image(self):
-        size = tuple(self.config.preprocessing.image.size)
-        if hasattr(self, 'clip_validator'):
+        # Get dimension from first available feature vector
+        for item_id, features in self.precomputed_features.items():
+            if 'clip_embedding' in features and 'resnet_embedding' in features:
+                clip_dim = len(features['clip_embedding'])
+                resnet_dim = len(features['resnet_embedding'])
+                return clip_dim + resnet_dim
+        
+        return 2600  # Fallback
+        
+    def get_empty_image(self) -> Dict[str, torch.Tensor]:
+        if self.use_precomputed:
             return {
-                'images': torch.zeros(3, size[0], size[1]),
-                'text_image_similarity': torch.tensor(0.0)
+                'images': torch.zeros(self.feature_dim)
             }
-        return {
-            'images': torch.zeros(3, size[0], size[1])
-        }
+        else:
+            size = self.cfg.size
+            if hasattr(self, 'clip_validator'):
+                return {
+                    'images': torch.zeros(3, size[0], size[1]),
+                    'text_image_similarity': torch.tensor(0.0)
+                }
+            return {
+                'images': torch.zeros(3, size[0], size[1])
+            }
 
     def __call__(self, image_path: str, title: str = '') -> Dict[str, torch.Tensor]:
+        if self.use_precomputed:
+            return self._get_precomputed_features(image_path, title)
+        else:
+            return self._process_raw_image(image_path, title)
+    
+    def _get_precomputed_features(self, image_path: str, title: str = '') -> Dict[str, torch.Tensor]:
+        """Get precomputed features for an item"""
+        if not image_path:
+            return self.get_empty_image()
+        
+        # Extract item ID from image path
+        item_id = os.path.splitext(os.path.basename(image_path))[0]
+        
+        if item_id not in self.precomputed_features:
+            return self.get_empty_image()
+        
+        features = self.precomputed_features[item_id]
+        
+        # Concatenate CLIP and ResNet embeddings
+        clip_emb = features.get('clip_embedding', np.zeros(512))
+        resnet_emb = features.get('resnet_embedding', np.zeros(2048))
+        
+        # Combine embeddings
+        combined_features = np.concatenate([clip_emb, resnet_emb])
+        
+        return {
+            'images': torch.tensor(combined_features, dtype=torch.float32)
+        }
+    
+    def _process_raw_image(self, image_path: str, title: str = '') -> Dict[str, torch.Tensor]:
+        """Process raw image (original implementation)"""
         if not image_path or not os.path.exists(image_path):
             return self.get_empty_image()
 

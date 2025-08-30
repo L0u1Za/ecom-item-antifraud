@@ -1,6 +1,27 @@
 # @package preprocessing.image
 
 size: [224, 224]
+mean: [0.485, 0.456, 0.406]
+std: [0.229, 0.224, 0.225]
+use_precomputed_features: true
+precomputed_features_path: "data/image_features.pkl"
+
+# Image feature extraction settings
+extract_features: true
+# Image directories are now taken from experiment config
+features_output_dir: "data"
+
+# Feature extraction models
+models:
+  clip_model: "ViT-B/32"
+  resnet_model: "resnet50"
+
+# Quality thresholds
+quality_thresholds:
+  min_resolution: 100
+  max_compression_ratio: 0.1
+  min_blurriness: 100
+  duplicate_hash_distance: 5
 
 augmentations:
   # Order matters! Start with geometric transforms, then color/intensity

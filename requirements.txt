@@ -4,8 +4,8 @@ scikit-learn
 torch==2.3.0
 torchmetrics==1.7.0
 matplotlib
-# torchvision
-# transformers
+torchvision
+transformers
 wandb
 opencv-python
 Pillow
@@ -13,7 +13,10 @@ tqdm
 optuna
 timm
 tab-transformer-pytorch
+sentence-transformers
+imagehash
 
 hydra-core
 bs4
 nltk
+torch-focal

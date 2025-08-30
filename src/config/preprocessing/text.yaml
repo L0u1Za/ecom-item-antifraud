@@ -2,7 +2,7 @@
 
 # rules for script preprocessing
 apply_cleaning: true
-apply_lemmatization: true
+apply_lemmatization: false
 add_fraud_indicators: true
 max_length: 1024
 

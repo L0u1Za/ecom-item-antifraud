@@ -41,43 +41,69 @@ class TextTower(nn.Module):
 class ImageTower(nn.Module):
     def __init__(self, cfg: DictConfig):
         super().__init__()
-        self.backbone = timm.create_model(
-            cfg.model.image.name,
-            pretrained=cfg.model.image.pretrained,
-            num_classes=0
-        )
-        self.proj = nn.Sequential(
-            nn.Linear(self.backbone.num_features, cfg.model.image.projection_dim),
-            nn.ReLU(),  # or nn.GELU()
-            nn.LayerNorm(cfg.model.image.projection_dim),
-            nn.Dropout(cfg.model.image.dropout)
-        )
-
-        if cfg.model.image.get("unfreeze", False):
-            self.unfreeze()
+        self.use_precomputed = cfg.model.image.get("use_precomputed_features", False)
+        
+        if self.use_precomputed:
+            # For precomputed features: CLIP (512) + ResNet (2048) = 2560
+            self.precomputed_input_dim = cfg.model.image.get("precomputed_input_dim", 2560)
+            
+            # Project precomputed features to desired output dimension
+            self.proj = nn.Sequential(
+                nn.Linear(self.precomputed_input_dim, cfg.model.image.projection_dim * 2),
+                nn.ReLU(),
+                nn.LayerNorm(cfg.model.image.projection_dim * 2),
+                nn.Dropout(cfg.model.image.dropout),
+                nn.Linear(cfg.model.image.projection_dim * 2, cfg.model.image.projection_dim),
+                nn.ReLU(),
+                nn.LayerNorm(cfg.model.image.projection_dim),
+                nn.Dropout(cfg.model.image.dropout)
+            )
         else:
-            self.freeze()
+            # Original timm backbone for raw images
+            self.backbone = timm.create_model(
+                cfg.model.image.name,
+                pretrained=cfg.model.image.pretrained,
+                num_classes=0
+            )
+            self.proj = nn.Sequential(
+                nn.Linear(self.backbone.num_features, cfg.model.image.projection_dim),
+                nn.ReLU(),
+                nn.LayerNorm(cfg.model.image.projection_dim),
+                nn.Dropout(cfg.model.image.dropout)
+            )
+
+            if cfg.model.image.get("unfreeze", False):
+                self.unfreeze()
+            else:
+                self.freeze()
         
     def forward(self, image_inputs: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            image_inputs: (B, C, H, W) tensor of images
+            image_inputs: Either (B, C, H, W) tensor of images or (B, feature_dim) precomputed features
         Returns:
             (B, proj_dim) tensor of image embeddings
         """
-        features = self.backbone(image_inputs)
-        img_emb = self.proj(features)
+        if self.use_precomputed:
+            img_emb = self.proj(image_inputs)
+        else:
+            # Process raw images through backbone
+            features = self.backbone(image_inputs)
+            img_emb = self.proj(features)
+        
         return img_emb
     
     def freeze(self):
         """Freeze all parameters"""
-        for param in self.backbone.parameters():
-            param.requires_grad = False
+        if hasattr(self, 'backbone'):
+            for param in self.backbone.parameters():
+                param.requires_grad = False
             
     def unfreeze(self):
         """Unfreeze all parameters"""
-        for param in self.backbone.parameters():
-            param.requires_grad = True
+        if hasattr(self, 'backbone'):
+            for param in self.backbone.parameters():
+                param.requires_grad = True
 
 class TabularTower(nn.Module):
     def __init__(self, cfg: DictConfig):

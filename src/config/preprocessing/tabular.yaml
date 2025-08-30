@@ -14,6 +14,7 @@ numerical_cols:
   - photos_published_count
   - videos_published_count
   - PriceDiscounted
+  - item_time_alive
   - item_count_fake_returns7
   - item_count_fake_returns30
   - item_count_fake_returns90
@@ -40,26 +41,80 @@ numerical_cols:
   - ExemplarReturnedValueTotal90
   - ItemVarietyCount
   - ItemAvailableCount
+  - seller_time_alive_x
+  - return_rate_30
+  - fake_return_rate_30
+  - refund_value_ratio_30
+  - sales_growth_7_30
+  - sales_growth_30_90
+  - sales_velocity
+  - seller_velocity
+  - desc_len
+  - desc_word_count
+  - name_len
+  - price_return_interaction
+  - gmv_per_day
+  - seller_total_items
+  - seller_total_sales
+  - seller_avg_return_rate
+  - seller_total_gmv_30
+  - seller_total_gmv_90
+  - seller_avg_price
+  - seller_median_price
+  - seller_total_returns_30
+  - seller_total_returns_90
+  - seller_total_fake_returns_30
+  - seller_total_fake_returns_90
+  - seller_sum_rating_1
+  - seller_sum_rating_2
+  - seller_sum_rating_3
+  - seller_sum_rating_4
+  - seller_sum_rating_5
+  - seller_total_photos
+  - seller_total_videos
+  - seller_avg_item_time_alive
+  - seller_variety_mean
+  - seller_available_mean
+  - seller_total_exemplar_accepted_30
+  - seller_total_order_accepted_30
+  - seller_total_exemplar_returned_30
+  - seller_total_exemplar_returned_value_30
+  - seller_time_alive_y
+  - seller_avg_rating_5_share
+  - anomaly_score
   - fraud_desc_brand_names
-  - fraud_desc_messenger
   - fraud_desc_mixed_alphabets
-  - fraud_desc_phone
-  - fraud_desc_repeated_chars
-  - fraud_desc_short_description
-  - fraud_desc_suspicious_keywords
-  - fraud_desc_suspicious_numbers
   - fraud_desc_title_description_mismatch
-  - fraud_desc_unusual_punct
-  - fraud_desc_url
   - fraud_title_brand_names
-  - fraud_title_messenger
-  - fraud_title_mixed_alphabets
-  - fraud_title_phone
-  - fraud_title_repeated_chars
   - fraud_title_short_description
-  - fraud_title_suspicious_keywords
-  - fraud_title_suspicious_numbers
   - fraud_title_title_description_mismatch
-  - fraud_title_unusual_punct
+  - image_exists
+  - clip_text_similarity_name
+  - clip_text_similarity_brand
+  - clip_text_similarity_category
+  - quality_width
+  - quality_height
+  - quality_aspect_ratio
+  - quality_total_pixels
+  - quality_file_size
+  - quality_compression_ratio
+  - quality_blurriness
+  - quality_mean_brightness
+  - quality_std_brightness
+  - quality_mean_saturation
+  - quality_std_saturation
+  - quality_is_grayscale
+  - quality_edge_density
+  - quality_has_clean_background
+  - quality_has_exif
+  - quality_exif_count
+  - exact_duplicates
+  - near_duplicates
+  - has_duplicates
+  - cross_seller_matches_within
+  - suspicious_sharing_within
+  - price_anomaly_score
+  - category_consistency
+  - price_anomaly_score_consistency
 
 scaling: "standard"

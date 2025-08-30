@@ -103,6 +103,81 @@ python prepare_data.py
 
 The script will provide progress updates and confirm successful completion.
 
+# Model Calibration
+
+### calibrate_temperature.py
+
+Calibrates a trained model using temperature scaling to improve probability calibration. This addresses overconfident predictions by optimizing a temperature parameter on the validation set.
+
+**Usage:**
+```bash
+python scripts/calibrate_temperature.py --config-path=config/calibration --config-name=default
+```
+
+**Configuration:**
+The script uses Hydra configuration. Edit `src/config/calibration/default.yaml` to customize parameters:
+
+```yaml
+# Model and training config
+model_path: "checkpoints/experiment_best.pt"
+training_config: "src/config/training/default.yaml"
+
+# Output settings
+output_dir: "calibrated_models"
+
+# Device configuration
+device: "auto"  # auto, cpu, cuda
+
+# Temperature optimization parameters
+optimization:
+  max_iter: 50
+  lr: 0.01
+
+# Calibration evaluation
+evaluation:
+  n_bins: 10  # Number of bins for ECE calculation
+```
+
+**Override parameters:**
+```bash
+# Override specific parameters
+python scripts/calibrate_temperature.py model_path=checkpoints/my_model.pt output_dir=my_calibrated_models
+
+# Use different config
+python scripts/calibrate_temperature.py --config-name=custom_calibration
+```
+
+**Outputs:**
+- `temperature_scaled_model.pt` - Calibrated model with optimal temperature
+- `reliability_diagram.png` - Before/after calibration comparison
+- `calibration_metrics.txt` - ECE and NLL improvement metrics
+
+**Example workflow:**
+```bash
+# 1. Train your model normally first
+python src/train.py --config-path=config/training --config-name=default
+
+# 2. Calibrate the trained model
+python scripts/calibrate_temperature.py \
+    model_path=checkpoints/experiment_best.pt \
+    training_config=src/config/training/default.yaml
+
+# 3. Use the calibrated model for inference
+# The calibrated model will have better probability calibration
+```
+
+**What it does:**
+- Loads your trained model and validation data
+- Optimizes temperature parameter using LBFGS on validation set
+- Evaluates calibration using Expected Calibration Error (ECE)
+- Generates reliability diagrams showing calibration improvement
+- Saves the temperature-scaled model for inference
+
+**When to use:**
+- Your model shows overconfident predictions
+- Probability calibration is important for your use case
+- You need well-calibrated uncertainty estimates
+
 # Inference Script
 
 This directory also contains an inference script `run_inference.py` to generate predictions on a test dataset using a trained model.
@@ -134,4 +209,3 @@ python run_inference.py test_path=../data/test_prepared.csv +model_path="/path/t
 The script will generate a `submission.csv` file in the root directory with two columns:
 - `id`: The item ID.
 - `prediction`: The predicted fraud probability (a value between 0 and 1).
-

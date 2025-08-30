@@ -10,6 +10,8 @@ model:
   image:
     enabled: false
     unfreeze: false
+    use_precomputed_features: true
+    precomputed_input_dim: 2560
     name: "efficientnet_b0"
     pretrained: true
     projection_dim: 256
