@@ -339,45 +339,32 @@ def extract_image_features(df, image_dir, config, batch_size=32):
     # Use ItemID column name from the dataset
     id_column = 'ItemID' if 'ItemID' in df.columns else 'item_id'
     
-    # Pre-check which images exist to avoid repeated file system calls
-    print("Pre-checking image existence...")
-    image_paths = {}
     image_extensions = ['.png']
     
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Checking images"):
+    # Process images one by one (no batching)
+    embeddings_data = {}
+    print("Processing image features...")
+    def process_row(row):
         item_id = row[id_column]
         image_path = None
-        
         for ext in image_extensions:
             potential_path = Path(image_dir) / f"{item_id}{ext}"
             if potential_path.exists():
                 image_path = potential_path
                 break
-        
-        image_paths[item_id] = image_path
-    
-    # Process images one by one (no batching)
-    image_features = []
-    embeddings_data = {}
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing images"):
-        item_id = row[id_column]
-        image_path = image_paths[item_id]
         if image_path is None:
-            # Handle missing images
             features = {
                 id_column: item_id,
                 'image_exists': False,
                 'clip_text_similarity_name': 0.0,
                 'clip_text_similarity_brand': 0.0,
                 'clip_text_similarity_category': 0.0,
-                # Add default quality features
                 'quality_width': 0, 'quality_height': 0, 'quality_aspect_ratio': 1.0,
                 'quality_total_pixels': 0, 'quality_file_size': 0, 'quality_compression_ratio': 0,
                 'quality_blurriness': 0, 'quality_mean_brightness': 0, 'quality_std_brightness': 0,
                 'quality_mean_saturation': 0, 'quality_std_saturation': 0, 'quality_is_grayscale': False,
                 'quality_edge_density': 0, 'quality_has_clean_background': False,
                 'quality_has_exif': False, 'quality_exif_count': 0,
-                # Add default hash features
                 'hash_ahash': '0' * 16, 'hash_phash': '0' * 16, 'hash_dhash': '0' * 16, 'hash_whash': '0' * 16
             }
             embeddings_data[str(item_id)] = {
@@ -385,17 +372,14 @@ def extract_image_features(df, image_dir, config, batch_size=32):
                 'resnet_embedding': np.zeros(2048)
             }
         else:
-            # Process existing images
             try:
                 from PIL import Image
                 import cv2
                 pil_image = Image.open(image_path).convert('RGB')
                 cv_image = cv2.imread(str(image_path))
-                # Extract embeddings and quality features
                 embeddings = extractor.extract_visual_embeddings(pil_image)
                 quality_features = extractor.extract_quality_features(pil_image, cv_image)
                 hash_features = extractor.extract_perceptual_hashes(pil_image)
-                # Compute text-image similarity
                 name = str(row.get('name_rus', ''))
                 brand_name = str(row.get('brand_name', ''))
                 category = str(row.get('CommercialTypeName4', ''))
@@ -419,7 +403,6 @@ def extract_image_features(df, image_dir, config, batch_size=32):
                 embeddings_data[str(item_id)] = embeddings
             except Exception as e:
                 print(f"Error processing {image_path}: {e}")
-                # Fallback to missing image handling
                 features = {
                     id_column: item_id,
                     'image_exists': False,
@@ -438,11 +421,9 @@ def extract_image_features(df, image_dir, config, batch_size=32):
                     'clip_embedding': np.zeros(512),
                     'resnet_embedding': np.zeros(2048)
                 }
-        image_features.append(features)
-        # Optionally clear GPU cache periodically
-        if torch.cuda.is_available() and idx % 100 == 0:
-            torch.cuda.empty_cache()
-    features_df = pd.DataFrame(image_features)
+        return features
+
+    features_df = df.apply(process_row, axis=1, result_type='expand')
     return features_df, embeddings_data
 
 
