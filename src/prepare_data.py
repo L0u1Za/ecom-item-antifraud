@@ -321,7 +321,7 @@ class ImageFeatureExtractor:
             }
 
 
-def extract_image_features(df, image_dir, config, batch_size=32):
+def extract_image_features(df, image_dir, config, batch_size=128):
     """Extract comprehensive image features for all items using batching and multiprocessing"""
     import time
     print("Extracting image features with optimizations...")
