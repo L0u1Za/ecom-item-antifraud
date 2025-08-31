@@ -323,28 +323,41 @@ class ImageFeatureExtractor:
 
 def extract_image_features(df, image_dir, config, batch_size=32):
     """Extract comprehensive image features for all items using batching and multiprocessing"""
+    import time
     print("Extracting image features with optimizations...")
-    
+    t0 = time.perf_counter()
+
     # Check for fast mode configuration
     fast_mode = config.preprocessing.image.get('fast_mode', False)
     enable_clip = not fast_mode and config.preprocessing.image.get('enable_clip', True)
     enable_resnet = not fast_mode and config.preprocessing.image.get('enable_resnet', True)
-    
+    t1 = time.perf_counter()
+    print(f"Config parsing and mode setup took {t1-t0:.2f} seconds")
+
     if fast_mode:
         print("⚡ FAST MODE ENABLED - Using lightweight feature extraction only")
         batch_size = 128  # Increase batch size for faster processing
-    
+
+    t2 = time.perf_counter()
     extractor = ImageFeatureExtractor(enable_clip=enable_clip, enable_resnet=enable_resnet)
-    
+    t3 = time.perf_counter()
+    print(f"Model initialization took {t3-t2:.2f} seconds")
+
     # Use ItemID column name from the dataset
     id_column = 'ItemID' if 'ItemID' in df.columns else 'item_id'
-    
+
     image_extensions = ['.png']
+
+    # Batch processing for embeddings and CLIP similarities
+    import math
+    from PIL import Image
+    import cv2
+    print("Processing image features in batches...")
+    t4 = time.perf_counter()
     
-    # Process images one by one (no batching)
-    embeddings_data = {}
-    print("Processing image features...")
-    def process_row(row):
+    # Prepare all image paths and meta
+    items = []
+    for idx, row in df.iterrows():
         item_id = row[id_column]
         image_path = None
         for ext in image_extensions:
@@ -352,57 +365,105 @@ def extract_image_features(df, image_dir, config, batch_size=32):
             if potential_path.exists():
                 image_path = potential_path
                 break
-        if image_path is None:
-            features = {
-                id_column: item_id,
-                'image_exists': False,
-                'clip_text_similarity_name': 0.0,
-                'clip_text_similarity_brand': 0.0,
-                'clip_text_similarity_category': 0.0,
-                'quality_width': 0, 'quality_height': 0, 'quality_aspect_ratio': 1.0,
-                'quality_total_pixels': 0, 'quality_file_size': 0, 'quality_compression_ratio': 0,
-                'quality_blurriness': 0, 'quality_mean_brightness': 0, 'quality_std_brightness': 0,
-                'quality_mean_saturation': 0, 'quality_std_saturation': 0, 'quality_is_grayscale': False,
-                'quality_edge_density': 0, 'quality_has_clean_background': False,
-                'quality_has_exif': False, 'quality_exif_count': 0,
-                'hash_ahash': '0' * 16, 'hash_phash': '0' * 16, 'hash_dhash': '0' * 16, 'hash_whash': '0' * 16
-            }
-            embeddings_data[str(item_id)] = {
-                'clip_embedding': np.zeros(512),
-                'resnet_embedding': np.zeros(2048)
-            }
-        else:
+        items.append({
+            'item_id': item_id,
+            'row': row,
+            'image_path': image_path
+        })
+
+    # Split into batches
+    def chunks(lst, n):
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+
+    embeddings_data = {}
+    features_list = []
+    total_batches = math.ceil(len(items) / batch_size)
+    for batch_idx, batch in enumerate(chunks(items, batch_size)):
+        batch_ids = [x['item_id'] for x in batch]
+        batch_rows = [x['row'] for x in batch]
+        batch_paths = [x['image_path'] for x in batch]
+        # Open images
+        pil_images = []
+        cv_images = []
+        for p in batch_paths:
+            if p is not None:
+                try:
+                    pil_images.append(Image.open(p).convert('RGB'))
+                    cv_images.append(cv2.imread(str(p)))
+                except Exception as e:
+                    pil_images.append(None)
+                    cv_images.append(None)
+            else:
+                pil_images.append(None)
+                cv_images.append(None)
+        # Embeddings batch
+        t_batch_start = time.perf_counter()
+        # CLIP embeddings
+        if enable_clip and any(img is not None for img in pil_images):
+            valid_idx = [i for i, img in enumerate(pil_images) if img is not None]
+            valid_images = [pil_images[i] for i in valid_idx]
             try:
-                from PIL import Image
-                import cv2
-                pil_image = Image.open(image_path).convert('RGB')
-                cv_image = cv2.imread(str(image_path))
-                embeddings = extractor.extract_visual_embeddings(pil_image)
-                quality_features = extractor.extract_quality_features(pil_image, cv_image)
-                hash_features = extractor.extract_perceptual_hashes(pil_image)
-                name = str(row.get('name_rus', ''))
-                brand_name = str(row.get('brand_name', ''))
-                category = str(row.get('CommercialTypeName4', ''))
-                if fast_mode:
-                    clip_similarity_name = 0.0
-                    clip_similarity_brand = 0.0
-                    clip_similarity_category = 0.0
-                else:
-                    clip_similarity_name = extractor.compute_clip_similarity(pil_image, name)
-                    clip_similarity_brand = extractor.compute_clip_similarity(pil_image, brand_name)
-                    clip_similarity_category = extractor.compute_clip_similarity(pil_image, category)
-                features = {
-                    id_column: item_id,
-                    'image_exists': True,
-                    'clip_text_similarity_name': clip_similarity_name,
-                    'clip_text_similarity_brand': clip_similarity_brand,
-                    'clip_text_similarity_category': clip_similarity_category,
-                    **{f'quality_{k}': v for k, v in quality_features.items()},
-                    **{f'hash_{k}': v for k, v in hash_features.items()}
-                }
-                embeddings_data[str(item_id)] = embeddings
+                inputs = extractor.clip_processor(images=valid_images, return_tensors="pt").to(extractor.device)
+                with torch.no_grad():
+                    clip_features = extractor.clip_model.get_image_features(**inputs)
+                clip_embs = clip_features.cpu().numpy()
             except Exception as e:
-                print(f"Error processing {image_path}: {e}")
+                print(f"Batch CLIP embedding error: {e}")
+                clip_embs = np.zeros((len(valid_images), 512))
+        else:
+            valid_idx = []
+            clip_embs = np.zeros((0, 512))
+        # ResNet embeddings
+        if enable_resnet and any(img is not None for img in pil_images):
+            valid_idx_r = [i for i, img in enumerate(pil_images) if img is not None]
+            valid_images_r = [pil_images[i] for i in valid_idx_r]
+            try:
+                resnet_inputs = torch.stack([extractor.resnet_transform(img) for img in valid_images_r]).to(extractor.device)
+                with torch.no_grad():
+                    resnet_features = extractor.resnet(resnet_inputs)
+                resnet_embs = resnet_features.cpu().numpy()
+            except Exception as e:
+                print(f"Batch ResNet embedding error: {e}")
+                resnet_embs = np.zeros((len(valid_images_r), 2048))
+        else:
+            valid_idx_r = []
+            resnet_embs = np.zeros((0, 2048))
+        # CLIP similarities (batched)
+        names = [str(row.get('name_rus', '')) for row in batch_rows]
+        brands = [str(row.get('brand_name', '')) for row in batch_rows]
+        categories = [str(row.get('CommercialTypeName4', '')) for row in batch_rows]
+        clip_sim_name = [0.0] * len(batch)
+        clip_sim_brand = [0.0] * len(batch)
+        clip_sim_category = [0.0] * len(batch)
+        if not fast_mode and enable_clip and any(img is not None for img in pil_images):
+            # Only compute for valid images
+            for key, texts, out_list in zip(['name', 'brand', 'category'], [names, brands, categories], [clip_sim_name, clip_sim_brand, clip_sim_category]):
+                valid_texts = [texts[i] for i in valid_idx]
+                valid_imgs = [pil_images[i] for i in valid_idx]
+                # Filter out empty texts
+                valid_pairs = [(img, txt) for img, txt in zip(valid_imgs, valid_texts) if txt and txt.lower() not in ['nan', 'none', '']]
+                if valid_pairs:
+                    imgs_for_sim, texts_for_sim = zip(*valid_pairs)
+                    try:
+                        inputs = extractor.clip_processor(text=list(texts_for_sim), images=list(imgs_for_sim), return_tensors="pt", padding=True, truncation=True, max_length=77).to(extractor.device)
+                        with torch.no_grad():
+                            outputs = extractor.clip_model(**inputs)
+                        sims = outputs.logits_per_image[:, 0].cpu().numpy()
+                    except Exception as e:
+                        print(f"Batch CLIP similarity error: {e}")
+                        sims = np.zeros(len(imgs_for_sim))
+                    # Assign back to out_list
+                    idx_map = [valid_idx[i] for i, (img, txt) in enumerate(zip(valid_imgs, valid_texts)) if txt and txt.lower() not in ['nan', 'none', '']]
+                    for j, idx in enumerate(idx_map):
+                        out_list[idx] = float(sims[j])
+        t_batch_emb = time.perf_counter()
+        # Per-image quality and hash features
+        for i, (item, pil_img, cv_img) in enumerate(zip(batch, pil_images, cv_images)):
+            item_id = item['item_id']
+            row = item['row']
+            image_path = item['image_path']
+            if image_path is None or pil_img is None:
                 features = {
                     id_column: item_id,
                     'image_exists': False,
@@ -421,9 +482,37 @@ def extract_image_features(df, image_dir, config, batch_size=32):
                     'clip_embedding': np.zeros(512),
                     'resnet_embedding': np.zeros(2048)
                 }
-        return features
+            else:
+                # Embeddings
+                # Find index in valid_idx/valid_idx_r
+                clip_idx = valid_idx.index(i) if i in valid_idx else None
+                resnet_idx = valid_idx_r.index(i) if i in valid_idx_r else None
+                clip_emb = clip_embs[clip_idx] if clip_idx is not None and len(clip_embs) > clip_idx else np.zeros(512)
+                resnet_emb = resnet_embs[resnet_idx] if resnet_idx is not None and len(resnet_embs) > resnet_idx else np.zeros(2048)
+                embeddings_data[str(item_id)] = {
+                    'clip_embedding': clip_emb,
+                    'resnet_embedding': resnet_emb
+                }
+                # Quality and hash
+                quality_features = extractor.extract_quality_features(pil_img, cv_img)
+                hash_features = extractor.extract_perceptual_hashes(pil_img)
+                features = {
+                    id_column: item_id,
+                    'image_exists': True,
+                    'clip_text_similarity_name': clip_sim_name[i],
+                    'clip_text_similarity_brand': clip_sim_brand[i],
+                    'clip_text_similarity_category': clip_sim_category[i],
+                    **{f'quality_{k}': v for k, v in quality_features.items()},
+                    **{f'hash_{k}': v for k, v in hash_features.items()}
+                }
+            features_list.append(features)
+        t_batch_end = time.perf_counter()
+        print(f"Batch {batch_idx+1}/{total_batches}: embeddings+clip_sim {t_batch_emb-t_batch_start:.2f}s, per-image {t_batch_end-t_batch_emb:.2f}s")
 
-    features_df = df.apply(process_row, axis=1, result_type='expand')
+    features_df = pd.DataFrame(features_list)
+    t5 = time.perf_counter()
+    print(f"Feature extraction for all images took {t5-t4:.2f} seconds")
+    print(f"Total time for extract_image_features: {t5-t0:.2f} seconds")
     return features_df, embeddings_data
 
 
