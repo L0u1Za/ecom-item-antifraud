@@ -16,7 +16,7 @@ project:
 # Data preparation settings
 data_preparation:
   train_path: data/ml_ozon_train.csv
-  test_path: data/ml_ozon_test.csv
+  test_path: data/test_full.csv
   output_dir: data
 
 processors:
